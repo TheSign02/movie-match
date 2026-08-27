@@ -15,7 +15,8 @@
     "clean:test": "supabase db query --linked -f scripts/cleanup-test-data.sql",
     "verify:privacy": "npm run seed:test && node --env-file=.env scripts/verify-privacy.mjs && npm run clean:test",
     "verify:tmdb": "node --env-file=.env scripts/verify-tmdb.mjs",
-    "fn:deploy": "supabase functions deploy tmdb"
+    "fn:deploy": "supabase functions deploy tmdb",
+    "verify:lobby": "node --env-file=.env scripts/verify-lobby.mjs"
   },
   "repository": {
     "type": "git",

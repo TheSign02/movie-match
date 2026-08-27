@@ -33,7 +33,9 @@ export function Screen({ children, gutter = 'screen', className = '' }: ScreenPr
   return (
     <div
       style={style}
-      className={`flex min-h-[100dvh] flex-1 flex-col bg-page ${className}`}
+      // relative so an ambient .glow can position against the screen;
+      // overflow-hidden so its negative offsets don't grow the page.
+      className={`relative flex min-h-[100dvh] flex-1 flex-col overflow-hidden bg-page ${className}`}
     >
       {children}
     </div>
