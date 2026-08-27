@@ -220,6 +220,13 @@ input.input:focus {
 .search:focus-within {
   border-color: var(--accent);
 }
+/* BUILD: the container above is this input's focus indicator, so
+   suppress the global :focus-visible outline rather than drawing a
+   second, square ring inside the rounded one. */
+.search input:focus,
+.search input:focus-visible {
+  outline: none;
+}
 
 .sec-label {
   font-size: var(--size-eyebrow);
@@ -367,6 +374,13 @@ input.input:focus {
   font-size: max(16px, var(--size-sm));
   padding: 0 10px;
   width: 100%;
+}
+/* Border rather than the global square outline, matching .input and
+   .search. */
+.select:focus,
+.select:focus-visible {
+  outline: none;
+  border-color: var(--accent);
 }
 .banner {
   border-radius: var(--r-sm);
