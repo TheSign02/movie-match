@@ -139,7 +139,23 @@ async function main() {
         'year is a number or null, never 0',
         hits.every((h) => h.year === null || (Number.isInteger(h.year) && h.year > 1800)),
       )
-      check('nothing is marked in_pool yet', hits.every((h) => h.in_pool === false))
+      // Not "nothing is in the pool": this runs against the real
+      // project, which has a real pool in it. The flag just has to be
+      // telling the truth.
+      const known = await client
+        .from('movies')
+        .select('tmdb_id, retired_at')
+        .in(
+          'tmdb_id',
+          hits.map((h) => h.tmdb_id),
+        )
+      const active = new Set(
+        (known.data ?? []).filter((r) => r.retired_at === null).map((r) => r.tmdb_id),
+      )
+      check(
+        'the in_pool flag agrees with the movies table',
+        hits.every((h) => h.in_pool === active.has(h.tmdb_id)),
+      )
     }
 
     const empty = await invoke(client, { action: 'search', q: '   ' })
@@ -185,60 +201,103 @@ async function main() {
 
     section('Pool writes')
 
-    const toAdd = bulkResults.slice(0, 3).map((m) => ({
-      tmdb_id: m.tmdb_id,
-      title: m.title,
-      year: m.year,
-      poster_path: m.poster_path,
-      overview: m.overview,
-    }))
-    addedTmdbIds.push(...toAdd.map((m) => m.tmdb_id))
+    /**
+     * This runs against the real project, whose pool belongs to a
+     * person. Every film touched below has to be one the table has
+     * never seen, verified against movies directly rather than trusting
+     * the in_pool flag — which reads false for a retired film too, and
+     * would have this suite retire and then delete somebody's row.
+     *
+     * Several queries are tried because a well-stocked pool may already
+     * contain everything the obvious one returns.
+     */
+    const attempts = [
+      { action: 'discover', sort: 'primary_release_date.desc', limit: 50 },
+      { action: 'discover', sort: 'popularity.desc', decade: 1960, limit: 50 },
+      { action: 'discover', sort: 'vote_average.desc', decade: 1970, limit: 50 },
+    ]
 
-    const insert = await client.from('movies').insert(toAdd)
-    check('an admin can add films', !insert.error, insert.error?.message ?? '')
+    let probe = null
+    let toAdd = []
 
-    const reSearch = await invoke(client, {
-      action: 'discover',
-      sort: 'vote_average.desc',
-      limit: 20,
-    })
-    const marked = (reSearch.data?.results ?? []).filter((r) => addedTmdbIds.includes(r.tmdb_id))
-    check(
-      'films already in the pool come back marked in_pool',
-      marked.length === 3 && marked.every((m) => m.in_pool === true && m.retired === false),
-      `${marked.length} of 3 marked`,
-    )
+    for (const attempt of attempts) {
+      const found = await invoke(client, attempt)
+      const hits = found.data?.results ?? []
+      if (hits.length === 0) continue
 
-    // Re-adding the same film has to be an un-retire, not a collision.
-    const first = addedTmdbIds[0]
-    const retire = await client
-      .from('movies')
-      .update({ retired_at: new Date().toISOString() })
-      .eq('tmdb_id', first)
-    check('an admin can retire a film', !retire.error, retire.error?.message ?? '')
+      const seen = await client
+        .from('movies')
+        .select('tmdb_id')
+        .in(
+          'tmdb_id',
+          hits.map((h) => h.tmdb_id),
+        )
+      const seenIds = new Set((seen.data ?? []).map((r) => r.tmdb_id))
 
-    const afterRetire = await invoke(client, {
-      action: 'discover',
-      sort: 'vote_average.desc',
-      limit: 20,
-    })
-    const retiredHit = (afterRetire.data?.results ?? []).find((r) => r.tmdb_id === first)
-    check(
-      'a retired film reads as retired, not as in_pool',
-      retiredHit?.retired === true && retiredHit?.in_pool === false,
-      `in_pool=${retiredHit?.in_pool} retired=${retiredHit?.retired}`,
-    )
+      const fresh = hits.filter((h) => !seenIds.has(h.tmdb_id)).slice(0, 3)
+      if (fresh.length === 3) {
+        probe = attempt
+        toAdd = fresh.map((m) => ({
+          tmdb_id: m.tmdb_id,
+          title: m.title,
+          year: m.year,
+          poster_path: m.poster_path,
+          overview: m.overview,
+        }))
+        break
+      }
+    }
 
-    const unretire = await client
-      .from('movies')
-      .upsert({ ...toAdd[0], retired_at: null }, { onConflict: 'tmdb_id' })
-    check('re-adding un-retires instead of colliding', !unretire.error, unretire.error?.message ?? '')
+    check('found three films the pool has never held', toAdd.length === 3)
 
-    const activeCount = await client
-      .from('movies')
-      .select('*', { count: 'exact', head: true })
-      .is('retired_at', null)
-    check('all three are active again', activeCount.count === 3, `count ${activeCount.count}`)
+    if (toAdd.length === 3) {
+      addedTmdbIds.push(...toAdd.map((m) => m.tmdb_id))
+
+      // upsert, matching addFilms in src/lib/pool.ts.
+      const insert = await client.from('movies').upsert(toAdd, { onConflict: 'tmdb_id' })
+      check('an admin can add films', !insert.error, insert.error?.message ?? '')
+
+      const reQuery = await invoke(client, probe)
+      const marked = (reQuery.data?.results ?? []).filter((r) => addedTmdbIds.includes(r.tmdb_id))
+      check(
+        'films already in the pool come back marked in_pool',
+        marked.length === 3 && marked.every((m) => m.in_pool === true && m.retired === false),
+        `${marked.length} of 3 marked`,
+      )
+
+      const first = addedTmdbIds[0]
+      const retire = await client
+        .from('movies')
+        .update({ retired_at: new Date().toISOString() })
+        .eq('tmdb_id', first)
+      check('an admin can retire a film', !retire.error, retire.error?.message ?? '')
+
+      const afterRetire = await invoke(client, probe)
+      const retiredHit = (afterRetire.data?.results ?? []).find((r) => r.tmdb_id === first)
+      check(
+        'a retired film reads as retired, not as in_pool',
+        retiredHit?.retired === true && retiredHit?.in_pool === false,
+        `in_pool=${retiredHit?.in_pool} retired=${retiredHit?.retired}`,
+      )
+
+      // Re-adding a retired film must un-retire it, not collide.
+      const unretire = await client
+        .from('movies')
+        .upsert({ ...toAdd[0], retired_at: null }, { onConflict: 'tmdb_id' })
+      check(
+        're-adding un-retires instead of colliding',
+        !unretire.error,
+        unretire.error?.message ?? '',
+      )
+
+      // Counted among the three added, never across the whole pool.
+      const activeCount = await client
+        .from('movies')
+        .select('*', { count: 'exact', head: true })
+        .in('tmdb_id', addedTmdbIds)
+        .is('retired_at', null)
+      check('all three are active again', activeCount.count === 3, `count ${activeCount.count}`)
+    }
   } finally {
     // ─── demote and clean up, whatever happened above ───────────────
     sql(`delete from admins where user_id = '${userId}';`)
@@ -251,7 +310,8 @@ async function main() {
   const leftover = await createClient(URL, ANON)
     .from('movies')
     .select('*', { count: 'exact', head: true })
-  console.log(`Pool now holds ${leftover.count ?? 0} films.`)
+    .is('retired_at', null)
+  console.log(`Pool holds ${leftover.count ?? 0} active films — unchanged by this run.`)
 
   console.log(`\n${'─'.repeat(64)}`)
   if (failures.length === 0) {

@@ -3,14 +3,17 @@
    (the :root block, lines 19–130), which remains the visual
    source of truth.
 
-   Two deliberate changes from the design file, both called for
-   by PLAN.md §13:
+   Three deliberate changes from the design file. The first two
+   are called for by PLAN.md §13, the third by §15:
      • --inset-top / --inset-bottom are env(safe-area-inset-*)
        here. The fixed 16px/34px in the design file were
        mimicking an iPhone 14 frame on a desktop page.
      • --bg-canvas is the design document's own backdrop and is
        unused by the app. Kept so the block stays a faithful
        copy rather than a fork.
+     • --scrim-card is heavier. The design's stops were authored
+       over dark placeholder gradients; real posters are often
+       bright. Old values are noted at the token.
 
    Do not introduce loose hex values in components.
    ═══════════════════════════════════════════════════════════ */
@@ -64,10 +67,17 @@
 
   /* Bottom scrim over poster art. Heavy on purpose — real
      TMDB posters are busy and often carry burned-in titles.  */
+  /* Retuned against real posters, as §15 predicted it would need
+     to be. The design file's stops (.97 / .72 at 34% /
+     transparent at 62%) were authored over the --poster-*
+     placeholders, and every one of those is a dark gradient.
+     Real TMDB art is frequently bright, which leaves the title
+     and overview fighting the image. Original values kept here
+     in case a device check says otherwise.                    */
   --scrim-card: linear-gradient(to top,
-                  rgba(0,0,0,.97) 0%,
-                  rgba(0,0,0,.72) 34%,
-                  rgba(0,0,0,0)   62%);
+                  rgba(0,0,0,.98) 0%,
+                  rgba(0,0,0,.82) 38%,
+                  rgba(0,0,0,0)   70%);
   --scrim-tile: linear-gradient(to top, rgba(0,0,0,.95), transparent);
 
   /* ---- Poster placeholders -------------------------------- */

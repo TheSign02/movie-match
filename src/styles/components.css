@@ -904,6 +904,10 @@ input.codecell:focus-visible {
 }
 .results-grid {
   flex: 1;
+  /* Required for the scroll: a flex item will not shrink below its
+     content without it, so the grid would push the screen taller
+     instead of scrolling inside it. */
+  min-height: 0;
   overflow-y: auto;
   padding: 0 24px var(--inset-bottom);
   display: grid;

@@ -139,8 +139,10 @@ export function Waiting() {
 
   return (
     <Screen className="items-center" gutter="none">
+      {/* No min-height here: Screen already owns the 100dvh, and a second
+          one inside its safe-area padding would overflow the viewport. */}
       <div
-        className="flex min-h-[100dvh] w-full flex-1 flex-col items-center"
+        className="flex w-full flex-1 flex-col items-center"
         style={{ paddingLeft: 30, paddingRight: 30 }}
       >
         <div className="center-col">

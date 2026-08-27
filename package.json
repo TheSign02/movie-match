@@ -13,13 +13,14 @@
     "db:advisors": "supabase db advisors --linked --level warn",
     "seed:test": "supabase db query --linked -f scripts/seed-test-movies.sql",
     "clean:test": "supabase db query --linked -f scripts/cleanup-test-data.sql",
-    "verify:privacy": "npm run seed:test && node --env-file=.env scripts/verify-privacy.mjs && npm run clean:test",
+    "verify:privacy": "node --env-file=.env scripts/verify-privacy.mjs",
     "verify:tmdb": "node --env-file=.env scripts/verify-tmdb.mjs",
     "fn:deploy": "supabase functions deploy tmdb",
     "verify:lobby": "node --env-file=.env scripts/verify-lobby.mjs",
     "verify:deck": "node --env-file=.env scripts/verify-deck.mjs",
     "verify:results": "node --env-file=.env scripts/verify-results.mjs",
-    "verify:all": "npm run verify:privacy && npm run verify:tmdb && npm run verify:lobby && npm run verify:deck && npm run verify:results"
+    "verify:all": "npm run verify:privacy && npm run verify:tmdb && npm run verify:lobby && npm run verify:deck && npm run verify:results",
+    "icons": "node scripts/make-icons.mjs"
   },
   "repository": {
     "type": "git",

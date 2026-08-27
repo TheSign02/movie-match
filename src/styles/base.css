@@ -38,6 +38,10 @@ body {
 
   /* No horizontal rubber-band on any screen. */
   overflow-x: hidden;
+
+  /* Kills the 300ms double-tap-to-zoom wait, so buttons respond on the
+     first tap. Pinch zoom is untouched — this only drops double-tap. */
+  touch-action: manipulation;
 }
 
 #root {

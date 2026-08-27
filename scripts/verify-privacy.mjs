@@ -15,6 +15,7 @@
  * npm run verify:privacy does all three in order.
  */
 
+import { execFileSync } from 'node:child_process'
 import { createClient } from '@supabase/supabase-js'
 
 const URL = process.env.VITE_SUPABASE_URL
@@ -24,6 +25,42 @@ if (!URL || !ANON) {
   console.error('Missing VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY.')
   console.error('Run via npm run verify:privacy, which passes --env-file=.env.')
   process.exit(1)
+}
+
+// ─── fixtures, and taking them away again ───────────────────────────
+
+function sql(statement) {
+  return execFileSync('supabase', ['db', 'query', '--linked', statement], {
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+  })
+}
+
+/**
+ * Every session this run creates, so cleanup can name them.
+ *
+ * Deleting "sessions whose deck overlaps the fixture films" is not good
+ * enough once the project has a real pool: create_session samples the
+ * whole active pool, so a test deck can be drawn entirely from real
+ * films and survive that filter. These ids are exact, and nothing else
+ * is touched.
+ */
+const createdSessions = []
+
+function cleanup() {
+  try {
+    if (createdSessions.length > 0) {
+      const ids = createdSessions.map((id) => `'${id}'`).join(', ')
+      sql(`delete from sessions where id in (${ids});`)
+    }
+    // Fixture films only ever have negative tmdb_ids; TMDB never issues
+    // one, so this cannot reach a real film.
+    sql('delete from movies where tmdb_id < 0;')
+    console.log('\nFixtures and test sessions removed.')
+  } catch (err) {
+    console.error(`\nCleanup failed: ${err.message}`)
+    console.error('Run: npm run clean:test')
+  }
 }
 
 // ─── tiny assertion harness ─────────────────────────────────────────
@@ -76,6 +113,14 @@ async function main() {
   console.log('Reel Consensus — privacy verification')
   console.log(`Target: ${URL}\n`)
 
+  sql(`
+    insert into movies (tmdb_id, title, year, poster_path, overview)
+    select -9000 - n, 'VERIFY FIXTURE ' || lpad(n::text, 2, '0'), 1970 + n,
+           '/verify-fixture-' || n || '.jpg', 'fixture overview'
+    from generate_series(1, 22) as g(n)
+    on conflict (tmdb_id) do nothing;
+  `)
+
   const A = await anonUser('A')
   const B = await anonUser('B')
   const C = await anonUser('C') // never joins anything of A and B's
@@ -93,6 +138,7 @@ async function main() {
   if (created.error) return
 
   const { session_id: sessionId, code, player_id: playerA } = created.data[0]
+  createdSessions.push(sessionId)
   console.log(`        session ${sessionId} code ${code}`)
 
   const joined = await B.client.rpc('join_session', {
@@ -239,6 +285,7 @@ async function main() {
   check('setup', 'C creates an unrelated session', !other.error, msg(other.error))
 
   if (!other.error) {
+    createdSessions.push(other.data[0].session_id)
     const wrongSession = await A.client
       .from('swipes')
       .insert(swipeRow(other.data[0].session_id, playerA, deck[0], true))
@@ -434,7 +481,10 @@ async function main() {
   process.exitCode = failures.length === 0 ? 0 : 1
 }
 
-main().catch((err) => {
-  console.error(`\n\x1b[31mThe run itself broke:\x1b[0m ${err.message}`)
-  process.exitCode = 1
-})
+main()
+  .catch((err) => {
+    console.error(`\n\x1b[31mThe run itself broke:\x1b[0m ${err.message}`)
+    process.exitCode = 1
+  })
+  // Synchronous, so it still runs as the process winds down.
+  .finally(cleanup)

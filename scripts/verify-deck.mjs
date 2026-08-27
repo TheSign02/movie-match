@@ -47,6 +47,9 @@ function sql(statement) {
   })
 }
 
+/** Exact ids, so cleanup never guesses at which sessions were ours. */
+const createdSessions = []
+
 function newClient() {
   return createClient(URL, ANON, {
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
@@ -105,6 +108,7 @@ async function main() {
     if (created.error) return
 
     const { session_id: sessionId, code, player_id: playerA } = created.data[0]
+    createdSessions.push(sessionId)
     const joined = await B.client.rpc('join_session', { p_code: code, p_display_name: 'Grace' })
     const playerB = joined.data[0].player_id
     await A.client.rpc('start_session', { p_session_id: sessionId })
@@ -252,8 +256,7 @@ async function main() {
     )
   } finally {
     sql(`
-      delete from sessions
-      where movie_ids && (select coalesce(array_agg(id), '{}') from movies where tmdb_id < 0);
+      delete from sessions where id in (${createdSessions.map((id) => `'${id}'`).join(', ') || "'00000000-0000-0000-0000-000000000000'"});
       delete from movies where tmdb_id < 0;
     `)
     console.log('\nFixtures and test sessions removed.')

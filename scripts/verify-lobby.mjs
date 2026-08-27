@@ -47,6 +47,9 @@ function sql(statement) {
   })
 }
 
+/** Exact ids, so cleanup never guesses at which sessions were ours. */
+const createdSessions = []
+
 function newClient() {
   return createClient(URL, ANON, {
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
@@ -137,8 +140,9 @@ async function main() {
     check('player 1 creates a lobby', !created.error, created.error?.message ?? '')
     if (created.error) return
 
-    const { session_id, code } = created.data[0]
+    const { session_id, code, player_id: playerA } = created.data[0]
     sessionId = session_id
+    createdSessions.push(sessionId)
     console.log(`        code ${code}`)
 
     // Player 1 is now sitting in the lobby with a live subscription, the
@@ -151,7 +155,14 @@ async function main() {
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'players', filter: `session_id=eq.${sessionId}` },
-        (payload) => playerInsert.settle(payload.new),
+        (payload) => {
+          // Realtime replays recent WAL entries to a new subscriber, so
+          // the first INSERT to arrive is often player 1's own row from
+          // moments earlier. The lobby screen refetches on any insert so
+          // an echo costs it nothing, but this is waiting for the
+          // partner specifically.
+          if (payload.new.id !== playerA) playerInsert.settle(payload.new)
+        },
       )
       .on(
         'postgres_changes',
@@ -268,8 +279,7 @@ async function main() {
     await B.client.removeChannel(channelB)
   } finally {
     sql(`
-      delete from sessions
-      where movie_ids && (select coalesce(array_agg(id), '{}') from movies where tmdb_id < 0);
+      delete from sessions where id in (${createdSessions.map((id) => `'${id}'`).join(', ') || "'00000000-0000-0000-0000-000000000000'"});
       delete from movies where tmdb_id < 0;
     `)
     console.log('\nFixtures and test sessions removed.')
