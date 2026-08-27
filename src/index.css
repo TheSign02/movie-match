@@ -19,6 +19,7 @@
 
 @import './styles/tokens.css';
 @import './styles/base.css';
+@import './styles/components.css';
 
 /* ═══════════════════════════════════════════════════════════
    Tailwind theme — references the tokens, never duplicates
