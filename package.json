@@ -8,7 +8,12 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "db:push": "supabase db push",
+    "db:advisors": "supabase db advisors --linked --level warn",
+    "seed:test": "supabase db query --linked -f scripts/seed-test-movies.sql",
+    "clean:test": "supabase db query --linked -f scripts/cleanup-test-data.sql",
+    "verify:privacy": "npm run seed:test && node --env-file=.env scripts/verify-privacy.mjs && npm run clean:test"
   },
   "repository": {
     "type": "git",
