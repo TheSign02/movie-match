@@ -1,0 +1,7 @@
+# core.autocrlf is on globally here; pin the repo to LF so the
+# checked-in bytes are identical on every machine.
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.woff binary
+*.woff2 binary

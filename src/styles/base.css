@@ -1,0 +1,110 @@
+/* ═══════════════════════════════════════════════════════════
+   Base layer. Mobile-web constraints from PLAN.md §13 live
+   here, and every one of them is load-bearing on iOS Safari.
+   ═══════════════════════════════════════════════════════════ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg-page);
+  color: var(--text-primary);
+
+  /* Safari's pull-to-refresh and rubber-banding otherwise fight
+     the swipe gesture on the deck. */
+  overscroll-behavior: none;
+}
+
+html {
+  /* dvh, never vh: 100vh on iOS Safari includes the URL bar, so
+     a full-height card layout gets clipped. */
+  height: 100dvh;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  min-height: 100dvh;
+  font-family: var(--font);
+  font-size: var(--size-body);
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+
+  /* No horizontal rubber-band on any screen. */
+  overflow-x: hidden;
+}
+
+#root {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Kill the iOS tap highlight; every interactive element gets a
+   real pressed state instead. */
+a,
+button,
+input,
+[role='button'] {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+/* Minimum 44px tap targets (§13). Opt out with .tap-exempt on
+   the rare decorative control. */
+button:not(.tap-exempt),
+[role='button']:not(.tap-exempt) {
+  min-height: var(--tap-min);
+  min-width: var(--tap-min);
+}
+
+input,
+textarea {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: none;
+}
+
+input {
+  /* iOS zooms the viewport on focus for anything under 16px. */
+  font-size: max(16px, var(--size-body-lg));
+}
+
+input::placeholder {
+  color: var(--text-faint);
+}
+
+img {
+  display: block;
+  max-width: 100%;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

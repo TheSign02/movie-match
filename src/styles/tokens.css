@@ -1,0 +1,131 @@
+/* ═══════════════════════════════════════════════════════════
+   Design tokens — ported verbatim from plans/Movie_Match.html
+   (the :root block, lines 19–130), which remains the visual
+   source of truth.
+
+   Two deliberate changes from the design file, both called for
+   by PLAN.md §13:
+     • --inset-top / --inset-bottom are env(safe-area-inset-*)
+       here. The fixed 16px/34px in the design file were
+       mimicking an iPhone 14 frame on a desktop page.
+     • --bg-canvas is the design document's own backdrop and is
+       unused by the app. Kept so the block stays a faithful
+       copy rather than a fork.
+
+   Do not introduce loose hex values in components.
+   ═══════════════════════════════════════════════════════════ */
+
+:root {
+
+  /* ---- Surfaces ------------------------------------------- */
+  --bg-page:    #000000;  /* phone screen background          */
+  --bg-canvas:  #0E0F12;  /* this document's backdrop         */
+  --bg-card:    #191B22;  /* inputs, list rows, swipe card     */
+  --bg-sunken:  #22252E;  /* progress tracks, disabled fills   */
+  --bg-raised:  #23262F;  /* second card in the deck stack     */
+
+  /* ---- Borders -------------------------------------------- */
+  --border-subtle:  #22252E;
+  --border-default: #2E323C;
+  --border-strong:  #464B57;
+
+  /* ---- Text ----------------------------------------------- */
+  --text-primary:   #FFFFFF;
+  --text-secondary: #EAEBF0;
+  --text-tertiary:  #D7D9E1;
+  --text-quiet:     #C0C4CC;
+  --text-muted:     #9AA0AC;
+  --text-faint:     #6C7280;
+  --text-disabled:  #464B57;
+
+  /* ---- Accent --------------------------------------------- */
+  /* Brighter than the corporate #16B632 on purpose: on true
+     black, the brand green reads muddy at small sizes.        */
+  --accent:         #1FC13C;
+  --accent-active:  #17A431;
+  --accent-soft:    #79E39B;  /* accent-coloured text          */
+  --accent-bright:  #56D473;
+  --accent-deep:    #157A2B;
+  --accent-deeper:  #0F5320;
+  --accent-darkest: #0A3315;
+  --on-accent:      #000000;
+
+  /* ---- Pass / reject -------------------------------------- */
+  --pass:      #E85555;
+  --pass-wash: rgba(232, 85, 85, .16);
+  --like-wash: rgba(31, 193, 60, .16);
+
+  /* ---- Glow & elevation ----------------------------------- */
+  --glow-accent:  0 12px 30px rgba(31, 193, 60, .28);
+  --glow-control: 0 10px 26px rgba(31, 193, 60, .32);
+  --shadow-card:  0 24px 60px rgba(0, 0, 0, .55);
+  --shadow-phone: 0 40px 90px rgba(0, 0, 0, .6);
+  --ring-accent:  0 0 0 4px rgba(31, 193, 60, .14);
+
+  /* Bottom scrim over poster art. Heavy on purpose — real
+     TMDB posters are busy and often carry burned-in titles.  */
+  --scrim-card: linear-gradient(to top,
+                  rgba(0,0,0,.97) 0%,
+                  rgba(0,0,0,.72) 34%,
+                  rgba(0,0,0,0)   62%);
+  --scrim-tile: linear-gradient(to top, rgba(0,0,0,.95), transparent);
+
+  /* ---- Poster placeholders -------------------------------- */
+  /* Stand-ins only. Every one of these gets replaced by a real
+     TMDB image; the card must be retested when they land.     */
+  --poster-1: linear-gradient(160deg, #157A2B, #000000 58%, #0A3315);
+  --poster-2: linear-gradient(160deg, #2E323C, #000000 62%, #22252E);
+  --poster-3: linear-gradient(160deg, #0F5320, #000000 60%, #191B22);
+  --poster-4: linear-gradient(160deg, #464B57, #000000 58%, #22252E);
+  --poster-5: linear-gradient(160deg, #22252E, #000000 55%, #0A3315);
+  --poster-6: linear-gradient(160deg, #17A431, #000000 62%, #000000);
+
+  /* ---- Type ----------------------------------------------- */
+  --font: 'Roboto', system-ui, -apple-system, 'Segoe UI', Arial, sans-serif;
+
+  --size-display: 52px;  /* wordmark                           */
+  --size-figure:  56px;  /* the match count                    */
+  --size-code:    76px;  /* lobby code                         */
+  --size-xl:      40px;
+  --size-lg:      36px;
+  --size-md:      34px;
+  --size-card:    26px;
+  --size-body-lg: 16px;
+  --size-body:    15px;
+  --size-sm:      13px;
+  --size-xs:      12px;
+  --size-eyebrow: 11px;
+
+  --track-eyebrow: .18em;
+  --track-label:   .14em;
+  --track-tight:  -.02em;
+  --track-tighter:-.03em;
+  --track-code:    .08em;
+
+  /* ---- Radii ---------------------------------------------- */
+  --r-xs:      4px;
+  --r-sm:      10px;
+  --r-md:      14px;
+  --r-lg:      16px;
+  --r-control: 18px;
+  --r-card:    26px;
+  --r-pill:    999px;
+
+  /* ---- Motion --------------------------------------------- */
+  --dur-fast:  120ms;
+  --dur-base:  220ms;
+  --ease-out:  cubic-bezier(.2, .8, .2, 1);
+
+  /* ---- Layout --------------------------------------------- */
+  --gutter-screen: 26px;  /* standard screen side padding      */
+  --gutter-deck:   20px;  /* swipe screen wants more card room */
+  --tap-min:       44px;
+  --control-h:     68px;
+
+  /* Real device insets. Requires viewport-fit=cover on the
+     viewport meta tag, or these report 0 on iOS.              */
+  --inset-top:    env(safe-area-inset-top, 0px);
+  --inset-bottom: env(safe-area-inset-bottom, 0px);
+  --inset-left:   env(safe-area-inset-left, 0px);
+  --inset-right:  env(safe-area-inset-right, 0px);
+}

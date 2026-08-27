@@ -1,0 +1,101 @@
+/* Single stylesheet entry point, imported once in main.tsx.
+   Order matters: tokens define the custom properties that the
+   @theme block below hands to Tailwind. */
+
+/* latin + latin-ext only. The bare @fontsource/roboto/400.css entry
+   pulls cyrillic, greek, vietnamese, math and symbol subsets too —
+   unicode-range keeps them off the wire, but off the disk is better.
+   latin-ext is here for Hungarian display names. */
+@import '@fontsource/roboto/latin-400.css';
+@import '@fontsource/roboto/latin-ext-400.css';
+@import '@fontsource/roboto/latin-500.css';
+@import '@fontsource/roboto/latin-ext-500.css';
+@import '@fontsource/roboto/latin-700.css';
+@import '@fontsource/roboto/latin-ext-700.css';
+@import '@fontsource/roboto/latin-900.css';
+@import '@fontsource/roboto/latin-ext-900.css';
+
+@import 'tailwindcss';
+
+@import './styles/tokens.css';
+@import './styles/base.css';
+
+/* ═══════════════════════════════════════════════════════════
+   Tailwind theme — references the tokens, never duplicates
+   them (PLAN.md §3). `inline` makes utilities resolve straight
+   to var(--bg-card) rather than through a second indirection.
+
+   Anything not mapped here is still reachable with an
+   arbitrary value: bg-[var(--accent-deeper)].
+   ═══════════════════════════════════════════════════════════ */
+@theme inline {
+  /* Surfaces */
+  --color-page: var(--bg-page);
+  --color-card: var(--bg-card);
+  --color-sunken: var(--bg-sunken);
+  --color-raised: var(--bg-raised);
+
+  /* Borders */
+  --color-edge: var(--border-default);
+  --color-edge-subtle: var(--border-subtle);
+  --color-edge-strong: var(--border-strong);
+
+  /* Text */
+  --color-primary: var(--text-primary);
+  --color-secondary: var(--text-secondary);
+  --color-tertiary: var(--text-tertiary);
+  --color-quiet: var(--text-quiet);
+  --color-muted: var(--text-muted);
+  --color-faint: var(--text-faint);
+  --color-disabled: var(--text-disabled);
+
+  /* Accent + pass */
+  --color-accent: var(--accent);
+  --color-accent-active: var(--accent-active);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-bright: var(--accent-bright);
+  --color-accent-deep: var(--accent-deep);
+  --color-accent-deeper: var(--accent-deeper);
+  --color-accent-darkest: var(--accent-darkest);
+  --color-on-accent: var(--on-accent);
+  --color-pass: var(--pass);
+
+  /* Type */
+  --font-sans: var(--font);
+
+  --text-display: var(--size-display);
+  --text-figure: var(--size-figure);
+  --text-code: var(--size-code);
+  --text-xl: var(--size-xl);
+  --text-lg: var(--size-lg);
+  --text-md: var(--size-md);
+  --text-card: var(--size-card);
+  --text-body-lg: var(--size-body-lg);
+  --text-body: var(--size-body);
+  --text-sm: var(--size-sm);
+  --text-xs: var(--size-xs);
+  --text-eyebrow: var(--size-eyebrow);
+
+  --tracking-eyebrow: var(--track-eyebrow);
+  --tracking-label: var(--track-label);
+  --tracking-tight: var(--track-tight);
+  --tracking-tighter: var(--track-tighter);
+  --tracking-code: var(--track-code);
+
+  /* Radii */
+  --radius-xs: var(--r-xs);
+  --radius-sm: var(--r-sm);
+  --radius-md: var(--r-md);
+  --radius-lg: var(--r-lg);
+  --radius-control: var(--r-control);
+  --radius-card: var(--r-card);
+  --radius-pill: var(--r-pill);
+
+  /* Elevation */
+  --shadow-accent: var(--glow-accent);
+  --shadow-control: var(--glow-control);
+  --shadow-card: var(--shadow-card);
+
+  /* Motion */
+  --ease-out: var(--ease-out);
+}
