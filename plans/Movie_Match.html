@@ -1,0 +1,1150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reel Consensus — design</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700;900&display=swap" rel="stylesheet">
+
+<style>
+/* ============================================================
+   REEL CONSENSUS — TOKENS
+   Dark, poster-led. True black page, one accent (vivid green).
+   This block replaces the inherited Webtown token system, which
+   was light-mode and unused by any screen here.
+   ============================================================ */
+:root {
+
+  /* ---- Surfaces ------------------------------------------- */
+  --bg-page:    #000000;  /* phone screen background          */
+  --bg-canvas:  #0E0F12;  /* this document's backdrop         */
+  --bg-card:    #191B22;  /* inputs, list rows, swipe card     */
+  --bg-sunken:  #22252E;  /* progress tracks, disabled fills   */
+  --bg-raised:  #23262F;  /* second card in the deck stack     */
+
+  /* ---- Borders -------------------------------------------- */
+  --border-subtle:  #22252E;
+  --border-default: #2E323C;
+  --border-strong:  #464B57;
+
+  /* ---- Text ----------------------------------------------- */
+  --text-primary:   #FFFFFF;
+  --text-secondary: #EAEBF0;
+  --text-tertiary:  #D7D9E1;
+  --text-quiet:     #C0C4CC;
+  --text-muted:     #9AA0AC;
+  --text-faint:     #6C7280;
+  --text-disabled:  #464B57;
+
+  /* ---- Accent --------------------------------------------- */
+  /* Brighter than the corporate #16B632 on purpose: on true
+     black, the brand green reads muddy at small sizes.        */
+  --accent:         #1FC13C;
+  --accent-active:  #17A431;
+  --accent-soft:    #79E39B;  /* accent-coloured text          */
+  --accent-bright:  #56D473;
+  --accent-deep:    #157A2B;
+  --accent-deeper:  #0F5320;
+  --accent-darkest: #0A3315;
+  --on-accent:      #000000;
+
+  /* ---- Pass / reject -------------------------------------- */
+  --pass:      #E85555;
+  --pass-wash: rgba(232, 85, 85, .16);
+  --like-wash: rgba(31, 193, 60, .16);
+
+  /* ---- Glow & elevation ----------------------------------- */
+  --glow-accent:  0 12px 30px rgba(31, 193, 60, .28);
+  --glow-control: 0 10px 26px rgba(31, 193, 60, .32);
+  --shadow-card:  0 24px 60px rgba(0, 0, 0, .55);
+  --shadow-phone: 0 40px 90px rgba(0, 0, 0, .6);
+  --ring-accent:  0 0 0 4px rgba(31, 193, 60, .14);
+
+  /* Bottom scrim over poster art. Heavy on purpose — real
+     TMDB posters are busy and often carry burned-in titles.  */
+  --scrim-card: linear-gradient(to top,
+                  rgba(0,0,0,.97) 0%,
+                  rgba(0,0,0,.72) 34%,
+                  rgba(0,0,0,0)   62%);
+  --scrim-tile: linear-gradient(to top, rgba(0,0,0,.95), transparent);
+
+  /* ---- Poster placeholders -------------------------------- */
+  /* Stand-ins only. Every one of these gets replaced by a real
+     TMDB image; the card must be retested when they land.     */
+  --poster-1: linear-gradient(160deg, #157A2B, #000000 58%, #0A3315);
+  --poster-2: linear-gradient(160deg, #2E323C, #000000 62%, #22252E);
+  --poster-3: linear-gradient(160deg, #0F5320, #000000 60%, #191B22);
+  --poster-4: linear-gradient(160deg, #464B57, #000000 58%, #22252E);
+  --poster-5: linear-gradient(160deg, #22252E, #000000 55%, #0A3315);
+  --poster-6: linear-gradient(160deg, #17A431, #000000 62%, #000000);
+
+  /* ---- Type ----------------------------------------------- */
+  --font: 'Roboto', system-ui, -apple-system, 'Segoe UI', Arial, sans-serif;
+
+  --size-display: 52px;  /* wordmark                           */
+  --size-figure:  56px;  /* the match count                    */
+  --size-code:    76px;  /* lobby code                         */
+  --size-xl:      40px;
+  --size-lg:      36px;
+  --size-md:      34px;
+  --size-card:    26px;
+  --size-body-lg: 16px;
+  --size-body:    15px;
+  --size-sm:      13px;
+  --size-xs:      12px;
+  --size-eyebrow: 11px;
+
+  --track-eyebrow: .18em;
+  --track-label:   .14em;
+  --track-tight:  -.02em;
+  --track-tighter:-.03em;
+  --track-code:    .08em;
+
+  /* ---- Radii ---------------------------------------------- */
+  --r-xs:      4px;
+  --r-sm:      10px;
+  --r-md:      14px;
+  --r-lg:      16px;
+  --r-control: 18px;
+  --r-card:    26px;
+  --r-pill:    999px;
+
+  /* ---- Motion --------------------------------------------- */
+  --dur-fast:  120ms;
+  --dur-base:  220ms;
+  --ease-out:  cubic-bezier(.2, .8, .2, 1);
+
+  /* ---- Layout --------------------------------------------- */
+  --gutter-screen: 26px;  /* standard screen side padding      */
+  --gutter-deck:   20px;  /* swipe screen wants more card room */
+  --tap-min:       44px;
+  --control-h:     68px;
+
+  /* In the real build these become env(safe-area-inset-*).
+     The fixed values here just mimic an iPhone 14 frame.      */
+  --inset-top:    16px;
+  --inset-bottom: 34px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root { --dur-fast: 0ms; --dur-base: 0ms; }
+  *, *::before, *::after { animation: none !important; }
+}
+
+/* ============================================================
+   BASE
+   ============================================================ */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  background: var(--bg-canvas);
+  color: var(--text-secondary);
+  font-family: var(--font);
+  font-size: var(--size-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+button { font-family: inherit; cursor: pointer; }
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ============================================================
+   DOCUMENT CHROME  (this page only — never built)
+   ============================================================ */
+.doc        { min-height: 100%; padding: 72px 64px 120px; }
+.doc-head   { display: flex; align-items: flex-start; gap: 20px; margin-bottom: 40px; }
+.doc-badge  { font-size: var(--size-xs); letter-spacing: var(--track-label);
+              color: var(--on-accent); background: var(--accent);
+              padding: 6px 10px; border-radius: 6px; font-weight: 700; }
+.doc-meta   { font-size: var(--size-xs); letter-spacing: var(--track-label);
+              text-transform: uppercase; color: var(--text-faint); margin-bottom: 10px; }
+.doc-title  { font-size: 44px; line-height: 1.05; letter-spacing: var(--track-tight);
+              font-weight: 700; color: var(--text-primary); max-width: 620px;
+              text-wrap: pretty; }
+.doc-sub    { font-size: var(--size-body); line-height: 1.6; color: var(--text-muted);
+              max-width: 620px; margin-top: 14px; }
+
+.swatches   { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 56px; }
+.swatch     { width: 108px; }
+.swatch i   { display: block; height: 40px; border-radius: 8px;
+              border: 1px solid var(--border-default); }
+.swatch b   { display: block; font-size: 10px; letter-spacing: .04em;
+              color: var(--text-quiet); margin-top: 7px; font-weight: 500; }
+.swatch s   { display: block; font-size: 10px; color: var(--text-faint);
+              text-decoration: none; }
+
+.frames     { display: flex; flex-wrap: wrap; gap: 64px 48px; align-items: flex-start; }
+.frame-label{ display: flex; align-items: baseline; gap: 10px; margin-bottom: 16px; }
+.frame-num  { font-size: var(--size-xs); color: var(--accent); }
+.frame-name { font-size: 17px; font-weight: 600; color: var(--text-primary); }
+.frame-note { font-size: var(--size-sm); color: var(--text-faint); }
+
+/* ============================================================
+   PHONE FRAME
+   ============================================================ */
+.phone {
+  width: 410px; height: 864px;
+  background: #000; border-radius: 54px; padding: 10px;
+  box-shadow: var(--shadow-phone), inset 0 0 0 1px var(--border-default);
+}
+.phone--short { height: 418px; border-radius: 40px; overflow: hidden; }
+
+.screen {
+  position: relative; width: 390px; height: 844px;
+  border-radius: 44px; overflow: hidden;
+  background: var(--bg-page);
+  display: flex; flex-direction: column;
+}
+.screen--short { height: 398px; border-radius: 32px; padding: 22px 20px; }
+.screen--admin { background: var(--bg-card); }
+
+/* mock OS chrome — design reference only */
+.statusbar {
+  position: relative; display: flex; justify-content: space-between;
+  align-items: center; padding: var(--inset-top) 30px 0; height: 54px;
+  font-size: var(--size-sm); font-weight: 500; color: var(--text-primary);
+}
+.bars   { display: flex; align-items: flex-end; gap: 2px; }
+.bars i { width: 3px; background: #fff; border-radius: 1px; }
+.bars i:nth-child(1) { height: 5px; }
+.bars i:nth-child(2) { height: 8px; }
+.bars i:nth-child(3) { height: 11px; }
+.batt   { width: 22px; height: 11px; border: 1px solid rgba(255,255,255,.6);
+          border-radius: 3px; padding: 1.5px; }
+.batt i { display: block; width: 70%; height: 100%; background: #fff; border-radius: 1px; }
+.status-right { display: flex; align-items: center; gap: 6px; }
+
+.home-ind { display: flex; justify-content: center; margin-top: 6px; }
+.home-ind i { width: 134px; height: 5px; border-radius: 3px;
+              background: rgba(255,255,255,.35); }
+
+.stage {
+  position: relative; flex: 1; display: flex; flex-direction: column;
+  padding: 0 var(--gutter-screen) var(--inset-bottom);
+}
+.stage--deck  { padding: 0 var(--gutter-deck) var(--inset-bottom); }
+.stage--flush { padding: 0; min-height: 0; }
+.stage--admin { padding: 0 18px var(--inset-bottom); min-height: 0; }
+.push { flex: 1; }
+
+/* ambient accent glow */
+.glow { position: absolute; border-radius: 50%; pointer-events: none; }
+.glow--home  { top: -120px; left: -80px; width: 420px; height: 420px;
+               background: radial-gradient(circle, rgba(31,193,60,.22), transparent 65%);
+               filter: blur(10px); }
+.glow--lobby { top: 180px; left: 50%; margin-left: -190px; width: 380px; height: 380px;
+               background: radial-gradient(circle, rgba(31,193,60,.16), transparent 62%); }
+.glow--ready { top: 150px; left: 50%; margin-left: -190px; width: 380px; height: 380px;
+               background: radial-gradient(circle, rgba(31,193,60,.26), transparent 62%); }
+.glow--top   { top: -60px; left: -40px; right: -40px; height: 300px; border-radius: 0;
+               background: radial-gradient(ellipse at 50% 0%, rgba(31,193,60,.24), transparent 70%); }
+
+/* ============================================================
+   TYPE
+   ============================================================ */
+.eyebrow {
+  font-size: var(--size-eyebrow); letter-spacing: var(--track-eyebrow);
+  text-transform: uppercase; color: var(--text-faint);
+}
+.eyebrow--accent { color: var(--accent); display: flex; align-items: center; gap: 9px; }
+.eyebrow--accent i { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
+.eyebrow--label { letter-spacing: var(--track-label); }
+
+.wordmark { font-size: var(--size-display); line-height: 1;
+            letter-spacing: var(--track-tighter); font-weight: 700;
+            color: var(--text-primary); }
+.t-xl  { font-size: var(--size-xl); line-height: 1.05; letter-spacing: var(--track-tighter);
+         font-weight: 700; color: var(--text-primary); }
+.t-lg  { font-size: var(--size-lg); line-height: 1.08; letter-spacing: var(--track-tight);
+         font-weight: 700; color: var(--text-primary); }
+.t-md  { font-size: var(--size-md); line-height: 1.05; letter-spacing: var(--track-tight);
+         font-weight: 700; color: var(--text-primary); }
+.figure{ font-size: var(--size-figure); line-height: 1; letter-spacing: var(--track-tighter);
+         font-weight: 700; color: var(--text-primary); }
+
+.lede  { font-size: var(--size-body); line-height: 1.6; color: var(--text-muted);
+         text-wrap: pretty; }
+.lede--lg { font-size: var(--size-body-lg); }
+
+/* ============================================================
+   CONTROLS
+   ============================================================ */
+.btn {
+  height: var(--control-h); border: 0; border-radius: var(--r-control);
+  font-size: 20px; font-weight: 700; letter-spacing: -.01em;
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  transition: transform var(--dur-fast) var(--ease-out),
+              background var(--dur-fast) var(--ease-out);
+}
+.btn:active { transform: scale(.985); }
+
+.btn--primary  { background: var(--accent); color: var(--on-accent);
+                 box-shadow: var(--glow-accent); }
+.btn--primary:active { background: var(--accent-active); }
+.btn--ghost    { background: transparent; border: 1px solid var(--border-strong);
+                 color: var(--text-secondary); font-weight: 600; }
+.btn--ghost:active { background: var(--bg-sunken); }
+.btn--off      { background: var(--bg-sunken); color: var(--text-disabled);
+                 cursor: not-allowed; }
+.btn--off:active { transform: none; }
+.btn--sm       { height: 52px; padding: 0 22px; border-radius: var(--r-md);
+                 font-size: var(--size-body); font-weight: 600; }
+.btn--sec      { height: 60px; font-size: 17px; font-weight: 600; }
+
+.field       { display: block; }
+.field .lab  { display: block; font-size: var(--size-eyebrow);
+               letter-spacing: .16em; text-transform: uppercase;
+               color: var(--text-faint); margin-bottom: 10px; }
+.input       { display: flex; align-items: center; height: 60px;
+               border-radius: var(--r-lg); background: var(--bg-card);
+               border: 1px solid var(--border-default); padding: 0 18px;
+               font-size: 19px; font-weight: 600; color: var(--text-primary); }
+.caret       { width: 2px; height: 24px; background: var(--accent); margin-left: 3px; }
+
+.codegrid    { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.codecell    { height: 76px; border-radius: var(--r-lg); background: var(--bg-card);
+               border: 1px solid var(--border-default);
+               display: flex; align-items: center; justify-content: center;
+               font-size: 36px; font-weight: 700; color: var(--text-primary); }
+.codecell--on{ border-color: var(--accent); box-shadow: var(--ring-accent); }
+
+.iconbtn     { width: var(--tap-min); height: var(--tap-min);
+               border-radius: 12px; border: 1px solid var(--border-default);
+               background: transparent;
+               display: flex; align-items: center; justify-content: center;
+               font-size: 20px; color: var(--text-quiet); }
+.topbar      { display: flex; align-items: center; justify-content: space-between;
+               padding-top: 18px; }
+.topbar .sp  { width: var(--tap-min); }
+
+/* ============================================================
+   LOBBY
+   ============================================================ */
+.code {
+  font-size: var(--size-code); line-height: 1; font-weight: 700;
+  letter-spacing: var(--track-code); color: var(--text-primary);
+  text-shadow: 0 0 40px rgba(31,193,60,.35);
+}
+.row {
+  display: flex; align-items: center; gap: 14px;
+  padding: 16px 18px; border-radius: var(--r-lg);
+  background: var(--bg-card); border: 1px solid var(--border-subtle);
+}
+.row--empty  { border-style: dashed; border-color: var(--border-default); }
+.row .grow   { flex: 1; }
+.row .who    { font-size: var(--size-body-lg); font-weight: 700; color: var(--text-primary); }
+.row .who s  { color: var(--text-faint); font-weight: 500; text-decoration: none; }
+.row .sub    { font-size: var(--size-sm); margin-top: 2px; }
+.row .sub--ok{ color: var(--accent); }
+.avatar      { width: 40px; height: 40px; border-radius: 50%;
+               display: flex; align-items: center; justify-content: center;
+               font-weight: 700; font-size: 17px; color: var(--on-accent);
+               background: var(--accent); }
+.avatar--2   { background: var(--accent-soft); }
+.avatar--none{ background: transparent; border: 1px dashed var(--border-strong); }
+.dots        { display: flex; gap: 4px; }
+.dots i      { width: 5px; height: 5px; border-radius: 50%;
+               background: var(--text-faint); animation: dots 1.4s infinite; }
+.dots i:nth-child(2) { animation-delay: .2s; }
+.dots i:nth-child(3) { animation-delay: .4s; }
+@keyframes dots { 0%,100% { opacity: .3 } 50% { opacity: 1 } }
+
+.stack-v { display: flex; flex-direction: column; gap: 12px; }
+.stack-v--lg { gap: 14px; }
+
+/* ============================================================
+   SWIPE DECK
+   ============================================================ */
+.deckbar   { display: flex; align-items: center; gap: 14px; padding: 14px 6px 0; }
+.track     { height: 5px; border-radius: 3px; background: var(--bg-sunken); overflow: hidden; }
+.track i   { display: block; height: 100%; border-radius: 3px;
+             background: var(--accent); transition: width var(--dur-base) var(--ease-out); }
+.counter   { font-size: 14px; font-weight: 700; color: var(--text-quiet);
+             min-width: 52px; text-align: right; }
+
+.deck      { position: relative; flex: 1; margin-top: 18px; }
+.deck-back { position: absolute; inset: 0; border-radius: var(--r-card);
+             border: 1px solid var(--border-default); }
+.deck-back--1 { background: var(--bg-sunken); transform: rotate(4.5deg) scale(.955); }
+.deck-back--2 { background: var(--bg-raised); transform: rotate(-2.5deg) scale(.978); }
+
+.card {
+  position: absolute; inset: 0; border-radius: var(--r-card); overflow: hidden;
+  background: var(--bg-card); border: 1px solid var(--border-default);
+  box-shadow: var(--shadow-card);
+  touch-action: none; cursor: grab; user-select: none;
+}
+.card__art   { position: absolute; inset: 0; }
+.card__grain { position: absolute; inset: 0; opacity: .16;
+               background-image: repeating-linear-gradient(115deg,
+                 rgba(255,255,255,.5) 0 1px, transparent 1px 5px); }
+.card__scrim { position: absolute; inset: 0; background: var(--scrim-card); }
+.card__meta  { position: absolute; left: 0; right: 0; bottom: 0; padding: 26px 22px 24px; }
+.chips       { display: flex; gap: 7px; margin-bottom: 14px; }
+.chip        { font-size: var(--size-eyebrow); letter-spacing: .09em;
+               text-transform: uppercase; color: var(--text-quiet);
+               border: 1px solid rgba(255,255,255,.22);
+               padding: 5px 9px; border-radius: var(--r-pill); }
+.card__title { font-size: var(--size-lg); line-height: 1.02;
+               letter-spacing: var(--track-tight); font-weight: 900;
+               color: var(--text-primary); text-wrap: balance; }
+.card__by    { font-size: 14px; font-weight: 500; color: var(--accent-soft); margin-top: 8px; }
+.card__blurb { font-size: var(--size-body); line-height: 1.55;
+               color: var(--text-tertiary); margin-top: 12px; text-wrap: pretty; }
+
+.stamp {
+  position: absolute; top: 22px; padding: 9px 14px; border-radius: var(--r-sm);
+  font-size: 22px; font-weight: 900; letter-spacing: .06em;
+  background: rgba(0,0,0,.35);
+}
+.stamp--like { left: 22px;  border: 2px solid var(--accent); color: var(--accent);
+               transform: rotate(-11deg); }
+.stamp--pass { right: 22px; border: 2px solid var(--pass);   color: var(--pass);
+               transform: rotate(11deg); }
+.wash        { position: absolute; inset: 0; pointer-events: none; }
+.wash--like  { background: var(--like-wash); }
+.wash--pass  { background: var(--pass-wash); }
+
+.deck-actions { display: flex; align-items: center; justify-content: center;
+                gap: 34px; padding-top: 22px; }
+.round        { width: 76px; height: 76px; border-radius: 50%;
+                display: flex; align-items: center; justify-content: center;
+                font-size: 30px; transition: transform var(--dur-fast) var(--ease-out); }
+.round:active { transform: scale(.94); }
+.round--pass  { border: 1px solid var(--border-strong); background: var(--bg-card);
+                color: var(--pass); }
+.round--pass:active { border-color: var(--pass); }
+.round--like  { border: 0; background: var(--accent); color: var(--on-accent);
+                box-shadow: var(--glow-control); }
+.round--like:active { background: var(--accent-active); }
+
+/* ============================================================
+   WAITING
+   ============================================================ */
+.pulse       { position: relative; width: 170px; height: 170px;
+               display: flex; align-items: center; justify-content: center; }
+.pulse i     { position: absolute; inset: 0; border-radius: 50%;
+               border: 1px solid rgba(31,193,60,.35);
+               animation: ring 3.4s ease-out infinite; }
+.pulse i:nth-child(2) { animation-delay: 1.1s; }
+.pulse i:nth-child(3) { animation-delay: 2.2s; }
+.pulse b     { width: 88px; height: 88px; border-radius: 50%;
+               background: radial-gradient(circle at 35% 30%,
+                 var(--accent-bright), var(--accent-deeper));
+               animation: breathe 4.2s ease-in-out infinite; }
+@keyframes ring    { 0% { transform: scale(.55); opacity: .9 }
+                     100% { transform: scale(1); opacity: 0 } }
+@keyframes breathe { 0%,100% { transform: scale(1) } 50% { transform: scale(1.06) } }
+
+.center-col  { flex: 1; display: flex; flex-direction: column;
+               align-items: center; justify-content: center; text-align: center; }
+.note        { display: flex; align-items: center; justify-content: center;
+               padding: 16px 18px; border-radius: var(--r-lg);
+               background: var(--bg-card); border: 1px solid var(--border-subtle);
+               font-size: var(--size-body); color: var(--text-quiet); }
+.note b      { color: var(--text-primary); font-weight: 700; }
+
+/* ============================================================
+   RESULTS
+   ============================================================ */
+.results-head { padding: 24px 24px 18px; }
+.results-grid { flex: 1; overflow-y: auto; padding: 0 24px var(--inset-bottom);
+                display: grid; grid-template-columns: 1fr 1fr;
+                gap: 12px; align-content: start; }
+.tile         { position: relative; border-radius: var(--r-lg); overflow: hidden;
+                height: 256px; border: 1px solid var(--border-subtle); }
+.tile__art    { position: absolute; inset: 0; }
+.tile__meta   { position: absolute; left: 0; right: 0; bottom: 0; padding: 14px;
+                background: var(--scrim-tile); }
+.tile__title  { font-size: 18px; font-weight: 700; color: var(--text-primary);
+                line-height: 1.1; }
+.tile__year   { font-size: var(--size-xs); color: var(--text-muted); margin-top: 4px; }
+.tile--again  { height: 256px; border-radius: var(--r-lg); border: 1px dashed var(--border-default);
+                background: transparent; display: flex; flex-direction: column;
+                align-items: center; justify-content: center; gap: 8px;
+                color: var(--text-faint); }
+.tile--again b { font-size: 24px; font-weight: 400; }
+.tile--again s { font-size: var(--size-sm); text-align: center;
+                 line-height: 1.4; padding: 0 14px; text-decoration: none; }
+
+.pair       { display: flex; align-items: center; }
+.pair i     { width: 76px; height: 110px; border-radius: 12px; display: block; }
+.pair i:first-child  { background: var(--poster-2); transform: rotate(-8deg); }
+.pair i:last-child   { background: var(--poster-4); transform: rotate(6deg);
+                       margin-left: -16px; }
+
+/* ============================================================
+   ADMIN
+   ============================================================ */
+.admin-head { display: flex; align-items: baseline; justify-content: space-between;
+              padding: 14px 4px 12px; }
+.search     { display: flex; align-items: center; gap: 10px; height: 50px;
+              border-radius: var(--r-sm); background: var(--bg-page);
+              border: 1px solid var(--border-default); padding: 0 14px; }
+.search span{ font-size: var(--size-body); color: var(--text-secondary); }
+.search .ic { color: var(--text-faint); }
+.search .caret { height: 20px; width: 1.5px; margin: 0; }
+
+.sec-label  { font-size: var(--size-eyebrow); letter-spacing: var(--track-label);
+              text-transform: uppercase; color: var(--text-faint); padding: 16px 4px 8px; }
+.group      { display: flex; flex-direction: column; gap: 1px;
+              border-radius: var(--r-sm); overflow: hidden;
+              border: 1px solid var(--border-subtle); }
+.hit        { display: flex; align-items: center; gap: 12px; padding: 10px;
+              background: var(--bg-page); }
+.hit--in    { opacity: .5; }
+.hit__art   { width: 44px; height: 64px; border-radius: var(--r-xs); flex: none; }
+.hit__body  { flex: 1; min-width: 0; }
+.hit__title { font-size: var(--size-body); font-weight: 700; color: var(--text-primary);
+              white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hit__sub   { font-size: var(--size-xs); color: var(--text-muted); margin-top: 3px; }
+.add        { height: 36px; padding: 0 14px; border-radius: 8px; border: 0;
+              background: var(--accent); color: var(--on-accent);
+              font-size: var(--size-xs); font-weight: 700; }
+.in-pool    { font-size: var(--size-xs); color: var(--accent); padding: 0 6px; }
+
+.pool       { flex: 1; min-height: 0; overflow-y: auto;
+              border-radius: var(--r-sm); border: 1px solid var(--border-subtle); }
+.pool-row   { display: flex; align-items: center; gap: 10px; padding: 9px 12px;
+              background: var(--bg-page); border-bottom: 1px solid var(--border-subtle); }
+.pool-row:last-child { border-bottom: 0; }
+.pool-row .n{ font-size: var(--size-eyebrow); color: var(--text-disabled); width: 20px; }
+.pool-row .art { width: 26px; height: 38px; border-radius: 3px; flex: none; }
+.pool-row .nm  { flex: 1; font-size: 14px; color: var(--text-secondary); }
+.pool-row .nm s{ color: var(--text-faint); font-size: var(--size-xs); text-decoration: none; }
+.pool-row .rm  { font-size: 16px; color: var(--text-faint); padding: 0 6px;
+                 background: none; border: 0; }
+
+.admin-actions { display: flex; gap: 8px; padding-top: 12px; }
+.admin-actions button { flex: 1; height: 52px; border-radius: var(--r-sm);
+                        font-size: var(--size-sm); letter-spacing: .06em; }
+.admin-actions .shuffle { border: 1px solid var(--border-strong);
+                          background: transparent; color: var(--text-quiet); }
+.admin-actions .save    { border: 0; background: var(--accent);
+                          color: var(--on-accent); font-weight: 700; }
+
+.mini-stack { display: flex; flex-direction: column; gap: 26px; }
+</style>
+</head>
+
+<body>
+<div class="doc">
+
+  <header class="doc-head">
+    <div class="doc-badge">1A</div>
+    <div>
+      <div class="doc-meta">Mobile web · 390 × 844 · portrait only</div>
+      <h1 class="doc-title">Two of you, one list.<br>Swipe until you agree.</h1>
+      <p class="doc-sub">Dark, poster-led, one accent on true black. Primary actions sit in the
+        bottom third; every frame respects notch and home-indicator insets. All colour, type and
+        motion now comes from the token block at the top of this file — no loose hex in the
+        markup. Type is Roboto, loaded as a webfont so it renders the same on Chrome and Safari.
+        The deck in frame 03 is live: drag it or tap the buttons.</p>
+    </div>
+  </header>
+
+  <section class="swatches" aria-label="Palette">
+    <div class="swatch"><i style="background:var(--bg-page)"></i>       <b>bg-page</b><s>#000000</s></div>
+    <div class="swatch"><i style="background:var(--bg-card)"></i>       <b>bg-card</b><s>#191B22</s></div>
+    <div class="swatch"><i style="background:var(--bg-sunken)"></i>     <b>bg-sunken</b><s>#22252E</s></div>
+    <div class="swatch"><i style="background:var(--border-default)"></i><b>border-default</b><s>#2E323C</s></div>
+    <div class="swatch"><i style="background:var(--border-strong)"></i> <b>border-strong</b><s>#464B57</s></div>
+    <div class="swatch"><i style="background:var(--accent)"></i>        <b>accent</b><s>#1FC13C</s></div>
+    <div class="swatch"><i style="background:var(--accent-active)"></i> <b>accent-active</b><s>#17A431</s></div>
+    <div class="swatch"><i style="background:var(--accent-soft)"></i>   <b>accent-soft</b><s>#79E39B</s></div>
+    <div class="swatch"><i style="background:var(--pass)"></i>          <b>pass</b><s>#E85555</s></div>
+    <div class="swatch"><i style="background:var(--text-muted)"></i>    <b>text-muted</b><s>#9AA0AC</s></div>
+    <div class="swatch"><i style="background:var(--text-faint)"></i>    <b>text-faint</b><s>#6C7280</s></div>
+  </section>
+
+  <div class="frames">
+
+    <!-- ══ 01 · HOME ═══════════════════════════════════════ -->
+    <div>
+      <div class="frame-label">
+        <span class="frame-num">01</span>
+        <span class="frame-name">Home</span>
+        <span class="frame-note">name + two big targets</span>
+      </div>
+      <div class="phone">
+        <div class="screen">
+          <div class="glow glow--home"></div>
+          <div class="statusbar">
+            <span>21:14</span>
+            <div class="status-right">
+              <div class="bars"><i></i><i></i><i></i></div>
+              <div class="batt"><i></i></div>
+            </div>
+          </div>
+          <div class="stage">
+            <div style="padding-top:46px">
+              <div class="eyebrow eyebrow--accent"><i></i>Movie night</div>
+              <div class="wordmark" style="margin-top:22px">Reel<br>Consensus</div>
+              <p class="lede" style="margin-top:16px;max-width:280px">Both of you swipe the same
+                twenty films. You only see the ones you both liked.</p>
+            </div>
+            <div class="push"></div>
+            <div class="stack-v stack-v--lg">
+              <label class="field">
+                <span class="lab">Your name</span>
+                <div class="input">Anna<span class="caret"></span></div>
+              </label>
+              <button class="btn btn--primary">Create a lobby</button>
+              <button class="btn btn--ghost">Join a lobby</button>
+              <div class="home-ind"><i></i></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ 01b · JOIN ══════════════════════════════════════ -->
+    <div>
+      <div class="frame-label">
+        <span class="frame-num">01b</span>
+        <span class="frame-name">Join a lobby</span>
+        <span class="frame-note">name + 4-char code</span>
+      </div>
+      <div class="phone">
+        <div class="screen">
+          <div class="statusbar">
+            <span>21:15</span>
+            <div class="status-right">
+              <div class="bars"><i></i><i></i><i></i></div>
+              <div class="batt"><i></i></div>
+            </div>
+          </div>
+          <div class="stage">
+            <div style="padding-top:40px">
+              <h2 class="t-md">Join a lobby</h2>
+              <p class="lede" style="margin-top:14px;max-width:290px">Anna will see your name in
+                the lobby, so use whatever they'd recognise.</p>
+            </div>
+            <div class="push"></div>
+            <div class="stack-v stack-v--lg">
+              <label class="field">
+                <span class="lab">Your name</span>
+                <div class="input">Márta<span class="caret"></span></div>
+              </label>
+              <div class="field">
+                <span class="lab">Lobby code</span>
+                <div class="codegrid">
+                  <div class="codecell">K</div>
+                  <div class="codecell">7</div>
+                  <div class="codecell">R</div>
+                  <div class="codecell codecell--on">9</div>
+                </div>
+              </div>
+              <button class="btn btn--primary">Join lobby</button>
+              <div class="home-ind"><i></i></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ 02 · LOBBY WAITING ══════════════════════════════ -->
+    <div>
+      <div class="frame-label">
+        <span class="frame-num">02</span>
+        <span class="frame-name">Lobby · waiting</span>
+      </div>
+      <div class="phone">
+        <div class="screen">
+          <div class="glow glow--lobby"></div>
+          <div class="statusbar">
+            <span>21:16</span>
+            <div class="status-right">
+              <div class="bars"><i></i><i></i><i></i></div>
+              <div class="batt"><i></i></div>
+            </div>
+          </div>
+          <div class="stage">
+            <div class="topbar">
+              <button class="iconbtn">←</button>
+              <div class="eyebrow" style="letter-spacing:.16em">Lobby</div>
+              <div class="sp"></div>
+            </div>
+            <div style="text-align:center;padding-top:52px">
+              <div class="code">K7R9</div>
+              <div style="display:flex;gap:10px;justify-content:center;margin-top:26px">
+                <button class="btn btn--ghost btn--sm">Copy code</button>
+                <button class="btn btn--ghost btn--sm">Share link</button>
+              </div>
+            </div>
+            <div class="push"></div>
+            <div class="stack-v">
+              <div class="row">
+                <div class="avatar">A</div>
+                <div class="grow">
+                  <div class="who">Anna <s>(you)</s></div>
+                  <div class="sub sub--ok">Ready</div>
+                </div>
+              </div>
+              <div class="row row--empty">
+                <div class="avatar avatar--none"></div>
+                <div class="grow">
+                  <div class="who" style="color:var(--text-muted);font-weight:600">Waiting for player 2</div>
+                  <div class="sub" style="color:var(--text-faint)">They just need the code</div>
+                </div>
+                <div class="dots"><i></i><i></i><i></i></div>
+              </div>
+              <button class="btn btn--off" style="margin-top:6px">Start swiping</button>
+              <div class="home-ind"><i></i></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ 02b · LOBBY READY ═══════════════════════════════ -->
+    <div>
+      <div class="frame-label">
+        <span class="frame-num">02b</span>
+        <span class="frame-name">Lobby · both in</span>
+      </div>
+      <div class="phone">
+        <div class="screen">
+          <div class="glow glow--ready"></div>
+          <div class="statusbar">
+            <span>21:18</span>
+            <div class="status-right">
+              <div class="bars"><i></i><i></i><i></i></div>
+              <div class="batt"><i></i></div>
+            </div>
+          </div>
+          <div class="stage">
+            <div class="topbar">
+              <button class="iconbtn">←</button>
+              <div class="eyebrow eyebrow--accent" style="letter-spacing:.16em">Both in</div>
+              <div class="sp"></div>
+            </div>
+            <div style="text-align:center;padding-top:52px">
+              <div class="eyebrow" style="letter-spacing:.2em">Lobby</div>
+              <div class="code" style="margin-top:18px">K7R9</div>
+              <p class="lede" style="margin-top:20px">Twenty films, same order for both of you.</p>
+            </div>
+            <div class="push"></div>
+            <div class="stack-v">
+              <div class="row">
+                <div class="avatar">A</div>
+                <div class="grow"><div class="who">Anna <s>(you)</s></div></div>
+                <div style="font-size:18px;color:var(--accent)">✓</div>
+              </div>
+              <div class="row">
+                <div class="avatar avatar--2">M</div>
+                <div class="grow"><div class="who">Márta</div></div>
+                <div style="font-size:18px;color:var(--accent)">✓</div>
+              </div>
+              <button class="btn btn--primary" style="margin-top:6px">Start swiping</button>
+              <div class="home-ind"><i></i></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ 03 · SWIPE DECK (live) ══════════════════════════ -->
+    <div>
+      <div class="frame-label">
+        <span class="frame-num">03</span>
+        <span class="frame-name">Swipe deck</span>
+        <span class="frame-note">live — drag it</span>
+      </div>
+      <div class="phone">
+        <div class="screen">
+          <div class="statusbar">
+            <span>21:24</span>
+            <div class="status-right">
+              <div class="bars"><i></i><i></i><i></i></div>
+              <div class="batt"><i></i></div>
+            </div>
+          </div>
+          <div class="stage stage--deck">
+            <div class="deckbar">
+              <button class="iconbtn" style="width:40px;height:40px;font-size:17px;color:var(--text-muted)">✕</button>
+              <div style="flex:1"><div class="track"><i id="bar" style="width:5%"></i></div></div>
+              <div class="counter" id="count">1/20</div>
+            </div>
+
+            <div class="deck">
+              <div class="deck-back deck-back--1"></div>
+              <div class="deck-back deck-back--2"></div>
+              <div class="card" id="card">
+                <div class="card__art" id="art"></div>
+                <div class="card__grain"></div>
+                <div class="card__scrim"></div>
+                <div class="card__meta">
+                  <div class="chips">
+                    <span class="chip" id="genre">Drama</span>
+                    <span class="chip" id="runtime">106 min</span>
+                  </div>
+                  <div class="card__title" id="title">Past Lives</div>
+                  <div class="card__by" id="by">2023 · dir. Celine Song</div>
+                  <p class="card__blurb" id="blurb">Two childhood friends reunite in New York,
+                    twenty-four years and one ocean later.</p>
+                </div>
+                <div class="stamp stamp--like" id="stampLike" style="opacity:0">LIKE</div>
+                <div class="stamp stamp--pass" id="stampPass" style="opacity:0">PASS</div>
+                <div class="wash wash--like" id="washLike" style="opacity:0"></div>
+                <div class="wash wash--pass" id="washPass" style="opacity:0"></div>
+              </div>
+            </div>
+
+            <div class="deck-actions">
+              <button class="round round--pass" id="btnPass" aria-label="Pass">✕</button>
+              <button class="round round--like" id="btnLike" aria-label="Like">♥</button>
+            </div>
+            <div class="home-ind" style="margin-top:14px"><i></i></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ 03b · DRAG CUES ═════════════════════════════════ -->
+    <div>
+      <div class="frame-label">
+        <span class="frame-num">03b</span>
+        <span class="frame-name">Drag cues</span>
+        <span class="frame-note">tilt + colour wash</span>
+      </div>
+      <div class="mini-stack">
+        <div class="phone phone--short">
+          <div class="screen screen--short">
+            <div class="deck-back deck-back--1" style="inset:22px 20px;border-radius:24px;transform:rotate(4.5deg) scale(.95)"></div>
+            <div class="card" style="position:relative;inset:auto;width:100%;height:100%;border-radius:24px;transform:rotate(13deg) translate(52px,10px)">
+              <div class="card__art" style="background:var(--poster-1)"></div>
+              <div class="wash wash--like" style="opacity:1"></div>
+              <div class="stamp stamp--like" style="transform:none;color:var(--accent-soft);border-color:var(--accent);background:rgba(0,0,0,.4)">LIKE</div>
+              <div class="card__scrim" style="background:var(--scrim-tile)"></div>
+              <div class="card__meta" style="padding:22px">
+                <div class="card__title" style="font-size:var(--size-card);font-weight:700">Past Lives</div>
+                <div class="card__by">2023 · dir. Celine Song</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="phone phone--short">
+          <div class="screen screen--short">
+            <div class="deck-back deck-back--1" style="inset:22px 20px;border-radius:24px;transform:rotate(4.5deg) scale(.95)"></div>
+            <div class="card" style="position:relative;inset:auto;width:100%;height:100%;border-radius:24px;transform:rotate(-13deg) translate(-52px,10px)">
+              <div class="card__art" style="background:var(--poster-4)"></div>
+              <div class="wash wash--pass" style="opacity:1"></div>
+              <div class="stamp stamp--pass" style="transform:none;background:rgba(0,0,0,.4)">PASS</div>
+              <div class="card__scrim" style="background:var(--scrim-tile)"></div>
+              <div class="card__meta" style="padding:22px">
+                <div class="card__title" style="font-size:var(--size-card);font-weight:700">Whiplash</div>
+                <div class="card__by" style="color:var(--text-quiet)">2014 · dir. Damien Chazelle</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ 04 · WAITING ════════════════════════════════════ -->
+    <div>
+      <div class="frame-label">
+        <span class="frame-num">04</span>
+        <span class="frame-name">Waiting on partner</span>
+      </div>
+      <div class="phone">
+        <div class="screen">
+          <div class="statusbar">
+            <span>21:41</span>
+            <div class="status-right">
+              <div class="bars"><i></i><i></i><i></i></div>
+              <div class="batt"><i></i></div>
+            </div>
+          </div>
+          <div class="stage" style="align-items:center;padding-left:30px;padding-right:30px">
+            <div class="center-col">
+              <div class="pulse"><i></i><i></i><i></i><b></b></div>
+              <h2 class="t-lg" style="margin-top:44px">That's your<br>twenty done.</h2>
+              <p class="lede lede--lg" style="margin-top:16px;max-width:270px">Márta is still
+                swiping. Your matches unlock the moment they finish.</p>
+            </div>
+            <div style="width:100%" class="stack-v">
+              <div class="note">You liked <b>&nbsp;9 films</b></div>
+              <div class="home-ind"><i></i></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ 05 · RESULTS ════════════════════════════════════ -->
+    <div>
+      <div class="frame-label">
+        <span class="frame-num">05</span>
+        <span class="frame-name">Results · matches</span>
+      </div>
+      <div class="phone">
+        <div class="screen">
+          <div class="glow glow--top"></div>
+          <div class="statusbar">
+            <span>21:47</span>
+            <div class="status-right">
+              <div class="bars"><i></i><i></i><i></i></div>
+              <div class="batt"><i></i></div>
+            </div>
+          </div>
+          <div class="stage stage--flush">
+            <div class="results-head">
+              <div class="eyebrow eyebrow--accent" style="letter-spacing:.2em">You agreed on</div>
+              <div class="figure" style="margin-top:10px">4 films</div>
+              <p class="lede" style="margin-top:10px">Out of 20 · that's a good night.</p>
+            </div>
+            <div class="results-grid">
+              <div class="tile">
+                <div class="tile__art" style="background:var(--poster-1)"></div>
+                <div class="tile__meta">
+                  <div class="tile__title">Past Lives</div>
+                  <div class="tile__year">2023</div>
+                </div>
+              </div>
+              <div class="tile">
+                <div class="tile__art" style="background:var(--poster-2)"></div>
+                <div class="tile__meta">
+                  <div class="tile__title">Parasite</div>
+                  <div class="tile__year">2019</div>
+                </div>
+              </div>
+              <div class="tile">
+                <div class="tile__art" style="background:var(--poster-4)"></div>
+                <div class="tile__meta">
+                  <div class="tile__title">Perfect Days</div>
+                  <div class="tile__year">2023</div>
+                </div>
+              </div>
+              <div class="tile">
+                <div class="tile__art" style="background:var(--poster-3)"></div>
+                <div class="tile__meta">
+                  <div class="tile__title">Arrival</div>
+                  <div class="tile__year">2016</div>
+                </div>
+              </div>
+              <button class="tile--again">
+                <b>＋</b>
+                <s>Swipe another<br>twenty</s>
+              </button>
+            </div>
+            <div class="home-ind" style="padding-bottom:var(--inset-bottom)"><i></i></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ 05b · RESULTS ZERO ══════════════════════════════ -->
+    <div>
+      <div class="frame-label">
+        <span class="frame-num">05b</span>
+        <span class="frame-name">Results · no overlap</span>
+      </div>
+      <div class="phone">
+        <div class="screen">
+          <div class="statusbar">
+            <span>21:47</span>
+            <div class="status-right">
+              <div class="bars"><i></i><i></i><i></i></div>
+              <div class="batt"><i></i></div>
+            </div>
+          </div>
+          <div class="stage">
+            <div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+              <div class="pair"><i></i><i></i></div>
+              <h2 class="t-xl" style="margin-top:34px">No overlap<br>this round.</h2>
+              <p class="lede lede--lg" style="margin-top:16px;max-width:290px">You liked 9,
+                Márta liked 7, none the same. It happens. The next twenty are already picked out.</p>
+            </div>
+            <div class="stack-v">
+              <button class="btn btn--primary">Swipe another twenty</button>
+              <div class="home-ind"><i></i></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ 06 · ADMIN ══════════════════════════════════════ -->
+    <div>
+      <div class="frame-label">
+        <span class="frame-num">06</span>
+        <span class="frame-name">Admin · pool</span>
+        <span class="frame-note">utilitarian</span>
+      </div>
+      <div class="phone">
+        <div class="screen screen--admin">
+          <div class="statusbar">
+            <span>21:52</span>
+            <div class="status-right">
+              <div class="bars"><i></i><i></i><i></i></div>
+              <div class="batt"><i></i></div>
+            </div>
+          </div>
+          <div class="stage stage--admin">
+            <div class="admin-head">
+              <div class="eyebrow eyebrow--label" style="font-size:var(--size-sm);color:var(--text-quiet)">Pool admin</div>
+              <div style="font-size:var(--size-xs);color:var(--text-faint)">TMDB</div>
+            </div>
+
+            <div class="search">
+              <span class="ic">⌕</span>
+              <span>past liv</span>
+              <span class="caret"></span>
+            </div>
+
+            <div class="sec-label">Search results</div>
+            <div class="group">
+              <div class="hit">
+                <div class="hit__art" style="background:var(--poster-1)"></div>
+                <div class="hit__body">
+                  <div class="hit__title">Past Lives</div>
+                  <div class="hit__sub">2023 · tt13238346</div>
+                </div>
+                <button class="add">ADD</button>
+              </div>
+              <div class="hit">
+                <div class="hit__art" style="background:var(--poster-4)"></div>
+                <div class="hit__body">
+                  <div class="hit__title">A Past Life</div>
+                  <div class="hit__sub">2016 · tt5093026</div>
+                </div>
+                <button class="add">ADD</button>
+              </div>
+              <div class="hit hit--in">
+                <div class="hit__art" style="background:var(--poster-2)"></div>
+                <div class="hit__body">
+                  <div class="hit__title">Lives of Others</div>
+                  <div class="hit__sub">2006 · in pool</div>
+                </div>
+                <div class="in-pool">✓</div>
+              </div>
+            </div>
+
+            <div class="admin-head" style="padding:20px 4px 8px">
+              <div class="sec-label" style="padding:0">Current pool</div>
+              <div style="font-size:var(--size-xs);color:var(--text-quiet)">20 / 20</div>
+            </div>
+
+            <div class="pool">
+              <div class="pool-row"><span class="n">01</span><div class="art" style="background:var(--poster-1)"></div><div class="nm">Past Lives <s>2023</s></div><button class="rm">✕</button></div>
+              <div class="pool-row"><span class="n">02</span><div class="art" style="background:var(--poster-2)"></div><div class="nm">Parasite <s>2019</s></div><button class="rm">✕</button></div>
+              <div class="pool-row"><span class="n">03</span><div class="art" style="background:var(--poster-3)"></div><div class="nm">Arrival <s>2016</s></div><button class="rm">✕</button></div>
+              <div class="pool-row"><span class="n">04</span><div class="art" style="background:var(--poster-4)"></div><div class="nm">Perfect Days <s>2023</s></div><button class="rm">✕</button></div>
+              <div class="pool-row"><span class="n">05</span><div class="art" style="background:var(--poster-5)"></div><div class="nm">Whiplash <s>2014</s></div><button class="rm">✕</button></div>
+              <div class="pool-row"><span class="n">06</span><div class="art" style="background:var(--poster-6)"></div><div class="nm">Portrait of a Lady on Fire <s>2019</s></div><button class="rm">✕</button></div>
+              <div class="pool-row"><span class="n">07</span><div class="art" style="background:var(--poster-2)"></div><div class="nm">Aftersun <s>2022</s></div><button class="rm">✕</button></div>
+            </div>
+
+            <div class="admin-actions">
+              <button class="shuffle">SHUFFLE</button>
+              <button class="save">SAVE POOL</button>
+            </div>
+            <div class="home-ind" style="margin-top:12px"><i></i></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   Live swipe deck — prototype logic for frame 03.
+   Pointer Events + setPointerCapture: one code path for touch,
+   mouse and pen, and works on both iOS Safari and Chrome.
+   Commits on distance OR velocity, so a fast short flick counts.
+   ============================================================ */
+(function () {
+  const DECK_SIZE = 20;
+  const THRESHOLD = 95;   // px of travel to commit
+  const FLICK     = 0.55; // px/ms to commit regardless of travel
+
+  const MOVIES = [
+    { title: 'Past Lives',   year: 2023, director: 'Celine Song',      genre: 'Drama',    runtime: '106 min', art: 'var(--poster-1)', blurb: "Two childhood friends reunite in New York, twenty-four years and one ocean later." },
+    { title: 'Parasite',     year: 2019, director: 'Bong Joon-ho',     genre: 'Thriller', runtime: '132 min', art: 'var(--poster-2)', blurb: "A family talks its way into a rich household, one small lie at a time." },
+    { title: 'Arrival',      year: 2016, director: 'Denis Villeneuve', genre: 'Sci-fi',   runtime: '116 min', art: 'var(--poster-3)', blurb: "A linguist is asked to translate a language that doesn't move in one direction." },
+    { title: 'Perfect Days', year: 2023, director: 'Wim Wenders',      genre: 'Drama',    runtime: '124 min', art: 'var(--poster-4)', blurb: "A Tokyo cleaner, cassette tapes, and the same quiet route every morning." },
+    { title: 'Whiplash',     year: 2014, director: 'Damien Chazelle',  genre: 'Drama',    runtime: '107 min', art: 'var(--poster-5)', blurb: "A drummer and a teacher discover how far each is willing to go." },
+    { title: 'Aftersun',     year: 2022, director: 'Charlotte Wells',  genre: 'Drama',    runtime: '102 min', art: 'var(--poster-6)', blurb: "A holiday in Turkey, remembered twenty years later by the daughter who was there." }
+  ];
+
+  const el = id => document.getElementById(id);
+  const card = el('card');
+  if (!card) return;
+
+  let i = 0, dx = 0, dragging = false, start = null, flying = false;
+
+  function paint() {
+    const m = MOVIES[i % MOVIES.length];
+    el('art').style.background = m.art;
+    el('genre').textContent   = m.genre;
+    el('runtime').textContent = m.runtime;
+    el('title').textContent   = m.title;
+    el('by').textContent      = m.year + ' · dir. ' + m.director;
+    el('blurb').textContent   = m.blurb;
+    el('count').textContent   = (i + 1) + '/' + DECK_SIZE;
+    el('bar').style.width     = Math.round(((i + 1) / DECK_SIZE) * 100) + '%';
+  }
+
+  function transform(x, y, animate) {
+    const clamp = v => Math.max(0, Math.min(1, v));
+    card.style.transition = animate ? 'transform var(--dur-base) var(--ease-out)' : 'none';
+    card.style.transform  = 'translate(' + x + 'px,' + y + 'px) rotate(' + (x / 22) + 'deg)';
+    el('stampLike').style.opacity = el('washLike').style.opacity = clamp(x / 110);
+    el('stampPass').style.opacity = el('washPass').style.opacity = clamp(-x / 110);
+  }
+
+  function advance(dir) {
+    if (flying) return;
+    flying = true;
+    transform(dir * 520, -40, true);
+    setTimeout(function () {
+      i = (i + 1) % DECK_SIZE;
+      dx = 0; flying = false;
+      transform(0, 0, false);
+      paint();
+    }, 220);
+  }
+
+  card.addEventListener('pointerdown', function (e) {
+    if (flying) return;
+    card.setPointerCapture(e.pointerId);
+    start = { x: e.clientX, y: e.clientY, t: e.timeStamp };
+    dragging = true;
+  });
+
+  card.addEventListener('pointermove', function (e) {
+    if (!dragging || !start) return;
+    dx = e.clientX - start.x;
+    transform(dx, (e.clientY - start.y) * 0.35, false);
+  });
+
+  function release(e) {
+    if (!dragging || !start) return;
+    dragging = false;
+    const dt = Math.max(1, e.timeStamp - start.t);
+    const v  = Math.abs(dx) / dt;
+    if (Math.abs(dx) > THRESHOLD || v > FLICK) advance(dx > 0 ? 1 : -1);
+    else transform(0, 0, true);
+    start = null;
+  }
+  card.addEventListener('pointerup', release);
+  card.addEventListener('pointercancel', release);
+
+  el('btnLike').addEventListener('click', function () { advance(1); });
+  el('btnPass').addEventListener('click', function () { advance(-1); });
+
+  paint();
+})();
+</script>
+</body>
+</html>
