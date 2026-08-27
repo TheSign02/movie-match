@@ -604,3 +604,221 @@ input.codecell:focus-visible {
   border-color: var(--accent);
   box-shadow: var(--ring-accent);
 }
+
+/* ─── Deck (frames 03, 03b) ─────────────────────────────── */
+
+.stage--deck {
+  padding: 0 var(--gutter-deck) var(--inset-bottom);
+}
+.stage--flush {
+  padding: 0;
+  min-height: 0;
+}
+
+.deckbar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 6px 0;
+}
+.track {
+  height: 5px;
+  border-radius: 3px;
+  background: var(--bg-sunken);
+  overflow: hidden;
+}
+.track i {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  background: var(--accent);
+  transition: width var(--dur-base) var(--ease-out);
+}
+.counter {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-quiet);
+  min-width: 52px;
+  text-align: right;
+}
+
+.deck {
+  position: relative;
+  flex: 1;
+  margin-top: 18px;
+}
+.deck-back {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--r-card);
+  border: 1px solid var(--border-default);
+}
+.deck-back--1 {
+  background: var(--bg-sunken);
+  transform: rotate(4.5deg) scale(0.955);
+}
+.deck-back--2 {
+  background: var(--bg-raised);
+  transform: rotate(-2.5deg) scale(0.978);
+}
+
+.card {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--r-card);
+  overflow: hidden;
+  background: var(--bg-card);
+  border: 1px solid var(--border-default);
+  box-shadow: var(--shadow-card);
+  /* Both required, per §11: without touch-action the browser scrolls
+     instead of dragging, and without user-select a long drag selects
+     the card text. */
+  touch-action: none;
+  cursor: grab;
+  user-select: none;
+}
+.card__art {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.card__grain {
+  position: absolute;
+  inset: 0;
+  opacity: 0.16;
+  background-image: repeating-linear-gradient(
+    115deg,
+    rgba(255, 255, 255, 0.5) 0 1px,
+    transparent 1px 5px
+  );
+  pointer-events: none;
+}
+.card__scrim {
+  position: absolute;
+  inset: 0;
+  background: var(--scrim-card);
+  pointer-events: none;
+}
+.card__meta {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 26px 22px 24px;
+}
+.chips {
+  display: flex;
+  gap: 7px;
+  margin-bottom: 14px;
+}
+.chip {
+  font-size: var(--size-eyebrow);
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--text-quiet);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  padding: 5px 9px;
+  border-radius: var(--r-pill);
+}
+.card__title {
+  font-size: var(--size-lg);
+  line-height: 1.02;
+  letter-spacing: var(--track-tight);
+  font-weight: 900;
+  color: var(--text-primary);
+  text-wrap: balance;
+}
+.card__by {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--accent-soft);
+  margin-top: 8px;
+}
+.card__blurb {
+  font-size: var(--size-body);
+  line-height: 1.55;
+  color: var(--text-tertiary);
+  margin-top: 12px;
+  text-wrap: pretty;
+}
+
+.stamp {
+  position: absolute;
+  top: 22px;
+  padding: 9px 14px;
+  border-radius: var(--r-sm);
+  font-size: 22px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  background: rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+}
+.stamp--like {
+  left: 22px;
+  border: 2px solid var(--accent);
+  color: var(--accent);
+  transform: rotate(-11deg);
+}
+.stamp--pass {
+  right: 22px;
+  border: 2px solid var(--pass);
+  color: var(--pass);
+  transform: rotate(11deg);
+}
+.wash {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.wash--like {
+  background: var(--like-wash);
+}
+.wash--pass {
+  background: var(--pass-wash);
+}
+
+/* 34px apart, wider than the original design because undo was removed
+   from between them. */
+.deck-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 34px;
+  padding-top: 22px;
+}
+.round {
+  width: 76px;
+  height: 76px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 30px;
+  transition: transform var(--dur-fast) var(--ease-out);
+  flex: none;
+}
+.round:active {
+  transform: scale(0.94);
+}
+.round--pass {
+  border: 1px solid var(--border-strong);
+  background: var(--bg-card);
+  color: var(--pass);
+}
+.round--pass:active {
+  border-color: var(--pass);
+}
+.round--like {
+  border: 0;
+  background: var(--accent);
+  color: var(--on-accent);
+  box-shadow: var(--glow-control);
+}
+.round--like:active {
+  background: var(--accent-active);
+}
+.round:disabled {
+  opacity: 0.5;
+}

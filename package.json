@@ -16,7 +16,8 @@
     "verify:privacy": "npm run seed:test && node --env-file=.env scripts/verify-privacy.mjs && npm run clean:test",
     "verify:tmdb": "node --env-file=.env scripts/verify-tmdb.mjs",
     "fn:deploy": "supabase functions deploy tmdb",
-    "verify:lobby": "node --env-file=.env scripts/verify-lobby.mjs"
+    "verify:lobby": "node --env-file=.env scripts/verify-lobby.mjs",
+    "verify:deck": "node --env-file=.env scripts/verify-deck.mjs"
   },
   "repository": {
     "type": "git",
