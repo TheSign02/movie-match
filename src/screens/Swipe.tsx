@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 
+import { CardFace } from '../components/CardFace'
 import { Screen } from '../components/Screen'
 import { SwipeCard, type SwipeCardHandle } from '../components/SwipeCard'
 import {
@@ -20,7 +21,11 @@ import {
 import { posterUrl } from '../lib/tmdb'
 import { usePlayerSession } from '../lib/usePlayerSession'
 
-/** How many posters ahead to warm, so a swipe never reveals an empty card. */
+/**
+ * How far ahead to warm posters. The card at index + 1 is rendered
+ * behind the live one so the browser already fetches it; this covers the
+ * two after that, so a swipe never reveals an empty card.
+ */
 const PRELOAD_AHEAD = 3
 
 /** Frame 03. */
@@ -113,7 +118,7 @@ export function Swipe() {
 
   useEffect(() => {
     if (!deck) return
-    for (let i = index + 1; i <= index + PRELOAD_AHEAD && i < deck.length; i++) {
+    for (let i = index + 2; i <= index + PRELOAD_AHEAD && i < deck.length; i++) {
       const url = posterUrl(deck[i]!.poster_path, 'w500')
       if (url) {
         const img = new Image()
@@ -184,6 +189,7 @@ export function Swipe() {
   }
 
   const film = deck[index]
+  const next = deck[index + 1]
   const remaining = deck.length - index
   const progress = Math.round(((index + 1) / deck.length) * 100)
 
@@ -215,10 +221,21 @@ export function Swipe() {
       ) : null}
 
       <div className="deck">
-        {/* Two static backs, so the stack reads as a deck. Dropped as the
-            films behind run out, or the last card sits on a phantom pile. */}
+        {/* The furthest back stays abstract — it is a sliver of edge and
+            a third poster there would be noise. Dropped as the films
+            behind run out, so the last card never sits on a phantom
+            pile. */}
         {remaining > 2 ? <div className="deck-back deck-back--1" /> : null}
-        {remaining > 1 ? <div className="deck-back deck-back--2" /> : null}
+
+        {/* The next film, rendered for real. It is visible from the
+            first pixel of a drag, and because it is a whole card the
+            moment the top one flies away reveals something finished
+            rather than a placeholder that then swaps. */}
+        {next ? (
+          <div className="card card--next" aria-hidden="true">
+            <CardFace film={next} />
+          </div>
+        ) : null}
 
         {film ? (
           <SwipeCard ref={cardRef} film={film} onCommit={onCommit} disabled={finishing} />

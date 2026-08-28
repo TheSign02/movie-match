@@ -34,6 +34,24 @@ export async function fetchLikedCounts(sessionId: string): Promise<LikedCount[]>
   return (data as LikedCount[]) ?? []
 }
 
+/**
+ * Another twenty, for the same two people.
+ *
+ * Idempotent per finished round: the first caller creates the new
+ * session with both players already in it, and the second caller is
+ * handed that same session. Calling create_session here instead would
+ * give each player their own lobby, each waiting for a partner sitting
+ * in the other one.
+ */
+export async function rematch(sessionId: string): Promise<{ sessionId: string; code: string }> {
+  const { data, error } = await supabase.rpc('rematch', { p_session_id: sessionId })
+  if (error) throw new Error(error.message)
+
+  const row = (data as { session_id: string; code: string }[])[0]
+  if (!row) throw new Error('rematch returned nothing')
+  return { sessionId: row.session_id, code: row.code }
+}
+
 /** Ends the round for a partner who stopped swiping (PLAN.md §9). */
 export async function abandonRound(sessionId: string): Promise<void> {
   const { error } = await supabase.rpc('abandon_round', { p_session_id: sessionId })

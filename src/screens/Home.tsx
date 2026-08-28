@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 
 import { Screen } from '../components/Screen'
 import {
   createSession,
   lastSessionId,
+  rememberName,
   rememberSession,
   resolveRoute,
   savedName,
@@ -14,6 +15,7 @@ import { usePlayerSession } from '../lib/usePlayerSession'
 /** Frame 01. Name entry and the two big targets. */
 export function Home() {
   const navigate = useNavigate()
+  const [params] = useSearchParams()
   const { session, loading, error: authError } = usePlayerSession()
 
   const [name, setName] = useState(savedName)
@@ -107,7 +109,7 @@ export function Home() {
             className="input"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="Anna"
+            placeholder="Name"
             autoComplete="nickname"
             maxLength={24}
             aria-label="Your name"
@@ -122,7 +124,18 @@ export function Home() {
           {busy ? 'Dealing twenty…' : 'Create a lobby'}
         </button>
 
-        <button className="btn btn--ghost" onClick={() => navigate('/join')}>
+        <button
+          className={`btn ${ready ? 'btn--ghost' : 'btn--off'}`}
+          disabled={!ready}
+          onClick={() => {
+            // The name is only entered here now, so it has to be stored
+            // before leaving — /join reads it rather than asking again,
+            // and would bounce straight back without this.
+            rememberName(name)
+            const code = params.get('code')
+            navigate(code ? `/join?code=${encodeURIComponent(code)}` : '/join')
+          }}
+        >
           Join a lobby
         </button>
       </div>

@@ -1,7 +1,7 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef } from 'react'
 
 import type { DeckFilm } from '../lib/deck'
-import { posterUrl } from '../lib/tmdb'
+import { CardFace } from './CardFace'
 
 /* ═══════════════════════════════════════════════════════════════════
    Swipe mechanics, ported from the prototype in the <script> block of
@@ -129,8 +129,6 @@ export const SwipeCard = forwardRef<SwipeCardHandle, SwipeCardProps>(function Sw
     start.current = null
   }
 
-  const poster = posterUrl(film.poster_path, 'w500')
-
   return (
     <div
       ref={card}
@@ -140,25 +138,7 @@ export const SwipeCard = forwardRef<SwipeCardHandle, SwipeCardProps>(function Sw
       onPointerUp={release}
       onPointerCancel={release}
     >
-      {poster ? (
-        <img className="card__art" src={poster} alt="" draggable={false} />
-      ) : (
-        <div className="card__art" style={{ background: 'var(--bg-raised)' }} />
-      )}
-
-      <div className="card__grain" />
-      <div className="card__scrim" />
-
-      <div className="card__meta">
-        {/* The design's chips carry genre and runtime, and its byline a
-            director. None of the three is in the movies table: §8 fixes
-            the stored shape at tmdb_id, title, year, poster_path and
-            overview, and filling the chips would mean a TMDB detail
-            request per film on every bulk import. Year stands alone. */}
-        <div className="card__title">{film.title}</div>
-        {film.year !== null ? <div className="card__by">{film.year}</div> : null}
-        {film.overview ? <p className="card__blurb">{film.overview}</p> : null}
-      </div>
+      <CardFace film={film} />
 
       <div ref={stampLike} className="stamp stamp--like" style={{ opacity: 0 }}>
         LIKE

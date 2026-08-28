@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 
 import { CODE_LENGTH, CodeInput } from '../components/CodeInput'
@@ -7,18 +7,24 @@ import { joinSession, savedName } from '../lib/session'
 import { usePlayerSession } from '../lib/usePlayerSession'
 
 /**
- * Frame 01b. Name and code, both required — player 2 sets their name
- * here, player 1 set theirs on Home.
+ * Frame 01b, minus the name field.
  *
- * A shared link arrives as /join?code=K7R9, so the code starts filled
- * and only the name is left to type.
+ * The design has a name input here because it was drawn as a standalone
+ * screen. In the built flow you can only arrive by typing a name on Home
+ * and tapping "Join a lobby", so asking again is asking twice. The name
+ * comes from storage and is shown, not re-entered.
+ *
+ * A shared link — /join?code=K7R9 — is the one way in that skips Home,
+ * and it arrives with no stored name. That case goes to Home carrying
+ * the code rather than growing a conditional second name field.
  */
 export function Join() {
   const navigate = useNavigate()
   const [params] = useSearchParams()
   const { loading, error: authError } = usePlayerSession()
 
-  const [name, setName] = useState(savedName)
+  const name = savedName()
+
   const [code, setCode] = useState(() =>
     (params.get('code') ?? '')
       .toUpperCase()
@@ -27,6 +33,13 @@ export function Join() {
   )
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+
+  // Arrived by share link with nothing stored: Home has the name field.
+  useEffect(() => {
+    if (name.trim() !== '') return
+    const incoming = params.get('code')
+    navigate(incoming ? `/?code=${encodeURIComponent(incoming)}` : '/', { replace: true })
+  }, [name, params, navigate])
 
   const ready = name.trim() !== '' && code.length === CODE_LENGTH && !loading && !busy
 
@@ -60,7 +73,8 @@ export function Join() {
       <div className="pt-10">
         <h2 className="t-md">Join a lobby</h2>
         <p className="lede mt-3.5 max-w-[290px]">
-          Whoever made the lobby will see your name, so use whatever they&rsquo;d recognise.
+          Joining as <b style={{ color: 'var(--text-primary)', fontWeight: 700 }}>{name}</b>.
+          Whoever made the lobby will see that name.
         </p>
       </div>
 
@@ -79,21 +93,12 @@ export function Join() {
           </div>
         ) : null}
 
-        <label className="field">
-          <span className="lab">Your name</span>
-          <input
-            className="input"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Márta"
-            autoComplete="nickname"
-            maxLength={24}
-            aria-label="Your name"
-          />
-        </label>
-
         <div className="field">
           <span className="lab">Lobby code</span>
+          {/* No auto-submit on the fourth character: onComplete fires
+              from inside CodeInput's commit, before this component has
+              re-rendered with the final character, so join() would read
+              a three-character code and quietly do nothing. */}
           <CodeInput value={code} onChange={setCode} />
         </div>
 

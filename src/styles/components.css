@@ -677,6 +677,15 @@ input.codecell:focus-visible {
   cursor: grab;
   user-select: none;
 }
+/* The next film, sitting behind the live card so the deck reads as a
+   stack of real films rather than of grey rectangles. Takes the same
+   transform the abstract .deck-back--2 had. Never interactive: the
+   gesture belongs to the card on top. */
+.card--next {
+  transform: rotate(-2.5deg) scale(0.978);
+  pointer-events: none;
+}
+
 .card__art {
   position: absolute;
   inset: 0;

@@ -2,15 +2,14 @@ import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 
 import { Screen } from '../components/Screen'
-import { fetchLikedCounts, fetchMatches, type LikedCount, type Match } from '../lib/results'
+import { fetchLikedCounts, fetchMatches, rematch, type LikedCount, type Match } from '../lib/results'
 import {
-  createSession,
   fetchMyPlayer,
   fetchSessionById,
   rememberSession,
   resolveRoute,
-  savedName,
 } from '../lib/session'
+import { supabase } from '../lib/supabase'
 import { posterUrl } from '../lib/tmdb'
 import { usePlayerSession } from '../lib/usePlayerSession'
 
@@ -74,23 +73,54 @@ export function Results() {
   }, [sessionId, userId, navigate])
 
   /**
-   * Another round is a new session with a new deck, so the partner
-   * joins again with the new code. Both players tapping this makes two
-   * lobbies; whoever shares their code first wins, and the other is
-   * abandoned harmlessly.
+   * Another twenty for the same two people. rematch is idempotent per
+   * finished round, so both players tapping this lands them in one
+   * lobby rather than two.
    */
   const again = useCallback(async () => {
     setStarting(true)
     setError(null)
     try {
-      rememberSession(null)
-      const { code } = await createSession(savedName() || 'Player 1')
-      navigate(`/lobby/${code}`)
+      const next = await rematch(sessionId)
+      rememberSession(next.sessionId)
+      navigate(`/lobby/${next.code}`)
     } catch (err) {
       setError((err as Error).message)
       setStarting(false)
     }
-  }, [navigate])
+  }, [navigate, sessionId])
+
+  /**
+   * The other half of the same problem: a player who never tapped has to
+   * be moved too. The new round arrives as an INSERT carrying
+   * rematch_of, and RLS lets this player see it because rematch already
+   * put them in it.
+   */
+  useEffect(() => {
+    if (!userId) return
+
+    const channel = supabase
+      .channel(`rematch:${sessionId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'sessions',
+          filter: `rematch_of=eq.${sessionId}`,
+        },
+        (payload) => {
+          const next = payload.new as { id: string; code: string }
+          rememberSession(next.id)
+          navigate(`/lobby/${next.code}`, { replace: true })
+        },
+      )
+      .subscribe()
+
+    return () => {
+      void supabase.removeChannel(channel)
+    }
+  }, [sessionId, userId, navigate])
 
   if (authLoading || matches === null) {
     return (

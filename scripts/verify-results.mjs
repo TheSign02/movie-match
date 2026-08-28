@@ -333,6 +333,104 @@ async function main() {
       bStillBlind.data?.length === 0,
       `${bStillBlind.data?.length} rows`,
     )
+
+    /* ─── another twenty, same two people ────────────────────────── */
+
+    section('Rematch')
+
+    const pair = await playRound({ likesA: (i) => i < 10, likesB: (i) => i < 10 })
+
+    // A player who never taps has to be moved too, so the results screen
+    // subscribes to the new round arriving.
+    const pushed = catcher('sessions INSERT carrying rematch_of')
+    const rematchChannel = pair.B.client
+      .channel(`rematch:${pair.sessionId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'sessions',
+          filter: `rematch_of=eq.${pair.sessionId}`,
+        },
+        (payload) => pushed.settle(payload.new),
+      )
+    await subscribed(rematchChannel)
+
+    const first = await pair.A.client.rpc('rematch', { p_session_id: pair.sessionId })
+    check('a participant can start another twenty', !first.error, first.error?.message ?? '')
+
+    const newId = first.data?.[0]?.session_id
+    if (newId) createdSessions.push(newId)
+
+    // The bug this replaces: create_session gave each player their own
+    // lobby. Both callers must land on one session.
+    const second = await pair.B.client.rpc('rematch', { p_session_id: pair.sessionId })
+    check(
+      'the partner tapping it lands in the SAME round, not a second one',
+      second.data?.[0]?.session_id === newId,
+      `${second.data?.[0]?.session_id} vs ${newId}`,
+    )
+
+    const rounds = await pair.A.client
+      .from('sessions')
+      .select('id', { count: 'exact', head: true })
+      .eq('rematch_of', pair.sessionId)
+    check('exactly one rematch exists for the round', rounds.count === 1, `count ${rounds.count}`)
+
+    try {
+      const row = await pushed.wait()
+      check('the partner is pushed into it without tapping', row.id === newId)
+    } catch (err) {
+      check('the partner is pushed into it without tapping', false, err.message)
+    }
+    await pair.B.client.removeChannel(rematchChannel)
+
+    const newPlayers = await pair.A.client
+      .from('players')
+      .select('slot, display_name, finished_at')
+      .eq('session_id', newId)
+      .order('slot')
+    check(
+      'both players are already in, with their names and slots',
+      newPlayers.data?.length === 2 &&
+        newPlayers.data[0].display_name === 'Ada' &&
+        newPlayers.data[1].display_name === 'Grace',
+      JSON.stringify(newPlayers.data?.map((p) => [p.slot, p.display_name])),
+    )
+    check(
+      'and neither is carrying a finished_at from the last round',
+      (newPlayers.data ?? []).every((p) => p.finished_at === null),
+    )
+
+    const newSession = await pair.A.client
+      .from('sessions')
+      .select('status, movie_ids, code')
+      .eq('id', newId)
+      .single()
+    check(
+      'the new round is waiting, with a fresh full deck',
+      newSession.data.status === 'waiting' && newSession.data.movie_ids.length === 20,
+      `status ${newSession.data.status}, ${newSession.data.movie_ids.length} films`,
+    )
+    check(
+      'and a different code from the round it replaces',
+      newSession.data.code && newSession.data.movie_ids.length === 20,
+    )
+
+    // Either player may start it, straight away, because both are in.
+    const startNew = await pair.B.client.rpc('start_session', { p_session_id: newId })
+    check('it can be started immediately', !startNew.error, startNew.error?.message ?? '')
+
+    const stranger = await anonUser()
+    const strangerRematch = await stranger.client.rpc('rematch', {
+      p_session_id: pair.sessionId,
+    })
+    check(
+      'a stranger cannot rematch someone else round',
+      !!strangerRematch.error && /not a participant/i.test(strangerRematch.error.message),
+      strangerRematch.error?.message ?? '(no error)',
+    )
   } finally {
     sql(`
       delete from sessions where id in (${createdSessions.map((id) => `'${id}'`).join(', ') || "'00000000-0000-0000-0000-000000000000'"});
