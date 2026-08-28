@@ -30,6 +30,7 @@ type TmdbAction =
   | { action: 'search'; q: string }
   | { action: 'discover'; sort: string; genre?: number; decade?: number; limit: number }
   | { action: 'genres' }
+  | { action: 'details'; ids: number[] }
 
 /**
  * functions.invoke puts a non-2xx response body inside the error rather
@@ -82,4 +83,20 @@ export function discoverFilms(opts: {
 
 export function fetchGenres() {
   return invoke<{ genres: Genre[] }>({ action: 'genres' }).then((r) => r.genres)
+}
+
+/**
+ * Runtimes by tmdb_id. One TMDB request per film behind the scenes,
+ * since only /movie/{id} carries a runtime — which is why this is called
+ * when films are added rather than for every search result.
+ */
+export async function fetchRuntimes(ids: number[]): Promise<Map<number, number | null>> {
+  if (ids.length === 0) return new Map()
+
+  const { details } = await invoke<{ details: { tmdb_id: number; runtime: number | null }[] }>({
+    action: 'details',
+    ids,
+  })
+
+  return new Map(details.map((d) => [d.tmdb_id, d.runtime]))
 }

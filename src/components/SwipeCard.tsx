@@ -36,10 +36,14 @@ type SwipeCardProps = {
   film: DeckFilm
   onCommit: (liked: boolean) => void
   disabled?: boolean
+  /** Only the top card takes the gesture; the rest are scenery. */
+  isTop?: boolean
+  /** Higher is nearer the front. */
+  zIndex?: number
 }
 
 export const SwipeCard = forwardRef<SwipeCardHandle, SwipeCardProps>(function SwipeCard(
-  { film, onCommit, disabled = false },
+  { film, onCommit, disabled = false, isTop = true, zIndex = 1 },
   ref,
 ) {
   const card = useRef<HTMLDivElement>(null)
@@ -74,16 +78,13 @@ export const SwipeCard = forwardRef<SwipeCardHandle, SwipeCardProps>(function Sw
     if (washPass.current) washPass.current.style.opacity = pass
   }, [])
 
-  // A new film means the previous one has flown out. Snap back to
-  // centre with no transition, so the incoming card does not slide in
-  // from where the last one left.
+  // Each card is keyed by film id and stays mounted as the stack
+  // advances, so this runs once. A card that becomes the top card has
+  // never been dragged and is already centred — which is exactly why
+  // nothing snaps when the card above it leaves.
   useEffect(() => {
-    flying.current = false
-    dragging.current = false
-    dx.current = 0
-    start.current = null
     paint(0, 0, false)
-  }, [film.id, paint])
+  }, [paint])
 
   const commit = useCallback(
     (liked: boolean) => {
@@ -102,7 +103,7 @@ export const SwipeCard = forwardRef<SwipeCardHandle, SwipeCardProps>(function Sw
   useImperativeHandle(ref, () => ({ fly: commit }), [commit])
 
   function onPointerDown(event: React.PointerEvent<HTMLDivElement>) {
-    if (flying.current || disabled) return
+    if (flying.current || disabled || !isTop) return
     // Capture means the drag survives the pointer leaving the card,
     // which it will on any real flick.
     card.current?.setPointerCapture(event.pointerId)
@@ -132,7 +133,9 @@ export const SwipeCard = forwardRef<SwipeCardHandle, SwipeCardProps>(function Sw
   return (
     <div
       ref={card}
-      className="card"
+      className={`card${isTop ? '' : ' card--behind'}`}
+      style={{ zIndex }}
+      aria-hidden={isTop ? undefined : true}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={release}

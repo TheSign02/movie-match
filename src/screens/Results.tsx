@@ -1,15 +1,15 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 
+import { MatchDetail } from '../components/MatchDetail'
 import { Screen } from '../components/Screen'
-import { fetchLikedCounts, fetchMatches, rematch, type LikedCount, type Match } from '../lib/results'
+import { fetchLikedCounts, fetchMatches, type LikedCount, type Match } from '../lib/results'
 import {
   fetchMyPlayer,
   fetchSessionById,
   rememberSession,
   resolveRoute,
 } from '../lib/session'
-import { supabase } from '../lib/supabase'
 import { posterUrl } from '../lib/tmdb'
 import { usePlayerSession } from '../lib/usePlayerSession'
 
@@ -25,7 +25,8 @@ export function Results() {
   /** Needed to say "You liked N" rather than matching on display name. */
   const [myPlayerId, setMyPlayerId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [starting, setStarting] = useState(false)
+  /** The match brought forward, if any. */
+  const [open, setOpen] = useState<Match | null>(null)
 
   const userId = auth?.user.id ?? null
 
@@ -73,54 +74,19 @@ export function Results() {
   }, [sessionId, userId, navigate])
 
   /**
-   * Another twenty for the same two people. rematch is idempotent per
-   * finished round, so both players tapping this lands them in one
-   * lobby rather than two.
+   * Home, to set up another round.
+   *
+   * This used to be a rematch that moved BOTH players into a new lobby.
+   * That was the wrong behaviour: one player being ready again should
+   * not pull the other off a results screen they are still reading. So
+   * leaving is a personal act — the partner keeps their matches on
+   * screen for as long as they want them.
    */
-  const again = useCallback(async () => {
-    setStarting(true)
-    setError(null)
-    try {
-      const next = await rematch(sessionId)
-      rememberSession(next.sessionId)
-      navigate(`/lobby/${next.code}`)
-    } catch (err) {
-      setError((err as Error).message)
-      setStarting(false)
-    }
-  }, [navigate, sessionId])
-
-  /**
-   * The other half of the same problem: a player who never tapped has to
-   * be moved too. The new round arrives as an INSERT carrying
-   * rematch_of, and RLS lets this player see it because rematch already
-   * put them in it.
-   */
-  useEffect(() => {
-    if (!userId) return
-
-    const channel = supabase
-      .channel(`rematch:${sessionId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'sessions',
-          filter: `rematch_of=eq.${sessionId}`,
-        },
-        (payload) => {
-          const next = payload.new as { id: string; code: string }
-          rememberSession(next.id)
-          navigate(`/lobby/${next.code}`, { replace: true })
-        },
-      )
-      .subscribe()
-
-    return () => {
-      void supabase.removeChannel(channel)
-    }
-  }, [sessionId, userId, navigate])
+  const leave = useCallback(() => {
+    // The round is over; nothing to come back to.
+    rememberSession(null)
+    navigate('/')
+  }, [navigate])
 
   if (authLoading || matches === null) {
     return (
@@ -140,6 +106,14 @@ export function Results() {
 
     return (
       <Screen>
+        <div className="topbar">
+          <button className="iconbtn" onClick={leave} aria-label="Back to the home screen">
+            ←
+          </button>
+          <div className="sp" />
+          <div className="sp" />
+        </div>
+
         <div className="flex flex-1 flex-col justify-center">
           <div className="pair" aria-hidden="true">
             <i />
@@ -168,12 +142,8 @@ export function Results() {
               {error}
             </div>
           ) : null}
-          <button
-            className={`btn ${starting ? 'btn--off' : 'btn--primary'}`}
-            onClick={() => void again()}
-            disabled={starting}
-          >
-            {starting ? 'Dealing…' : 'Swipe another twenty'}
+          <button className="btn btn--primary" onClick={leave}>
+            Swipe another twenty
           </button>
         </div>
       </Screen>
@@ -185,6 +155,17 @@ export function Results() {
   return (
     <Screen gutter="none">
       <div className="glow glow--top" />
+
+      {/* BUILD: the frame has no back control, because it was drawn as the
+          end of the flow. The round really does end here, so there has to
+          be a way out that does not involve closing the tab. */}
+      <div className="topbar" style={{ padding: '18px 20px 0' }}>
+        <button className="iconbtn" onClick={leave} aria-label="Back to the home screen">
+          ←
+        </button>
+        <div className="sp" />
+        <div className="sp" />
+      </div>
 
       <div className="results-head">
         <div className="eyebrow eyebrow--accent" style={{ letterSpacing: '.2em' }}>
@@ -211,8 +192,17 @@ export function Results() {
       <div className="results-grid">
         {matches.map((match) => {
           const poster = posterUrl(match.poster_path, 'w500')
+          const sub = [match.year, match.runtime ? `${match.runtime} min` : null]
+            .filter(Boolean)
+            .join(' · ')
+
           return (
-            <div className="tile" key={match.movie_id}>
+            <button
+              className="tile tap-exempt"
+              key={match.movie_id}
+              onClick={() => setOpen(match)}
+              aria-label={`${match.title}, more about this film`}
+            >
               {poster ? (
                 <img className="tile__art" src={poster} alt="" loading="lazy" />
               ) : (
@@ -220,27 +210,37 @@ export function Results() {
               )}
               <div className="tile__meta">
                 <div className="tile__title">{match.title}</div>
-                <div className="tile__year">{match.year ?? ''}</div>
+                <div className="tile__year">{sub}</div>
               </div>
-            </div>
+            </button>
           )
         })}
 
-        <button className="tile--again" onClick={() => void again()} disabled={starting}>
+        <button className="tile--again" onClick={leave}>
           <b>＋</b>
           <s>
-            {starting ? (
-              'Dealing…'
-            ) : (
-              <>
-                Swipe another
-                <br />
-                twenty
-              </>
-            )}
+            Swipe another
+            <br />
+            twenty
           </s>
         </button>
       </div>
+
+      {/* Match is the get_matches row shape; CardFace speaks DeckFilm.
+          Same fields under different names. */}
+      {open ? (
+        <MatchDetail
+          film={{
+            id: open.movie_id,
+            title: open.title,
+            year: open.year,
+            poster_path: open.poster_path,
+            overview: open.overview,
+            runtime: open.runtime,
+          }}
+          onClose={() => setOpen(null)}
+        />
+      ) : null}
     </Screen>
   )
 }

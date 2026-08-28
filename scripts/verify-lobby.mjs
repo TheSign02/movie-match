@@ -130,6 +130,8 @@ async function main() {
 
   const A = await anonUser()
   const B = await anonUser()
+  // One outsider for the whole suite; sign-ins are rate limited.
+  const C = await anonUser()
 
   let sessionId = null
 
@@ -253,7 +255,6 @@ async function main() {
       rejoin.error?.message ?? '',
     )
 
-    const C = await anonUser()
     const late = await C.client.rpc('join_session', { p_code: code, p_display_name: 'Carol' })
     check(
       'a stranger cannot join a running round',

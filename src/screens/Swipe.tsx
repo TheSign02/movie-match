@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 
-import { CardFace } from '../components/CardFace'
 import { Screen } from '../components/Screen'
 import { SwipeCard, type SwipeCardHandle } from '../components/SwipeCard'
 import {
@@ -18,15 +17,17 @@ import {
   resolveRoute,
   type Player,
 } from '../lib/session'
-import { posterUrl } from '../lib/tmdb'
 import { usePlayerSession } from '../lib/usePlayerSession'
 
 /**
- * How far ahead to warm posters. The card at index + 1 is rendered
- * behind the live one so the browser already fetches it; this covers the
- * two after that, so a swipe never reveals an empty card.
+ * How many cards are mounted at once, the live one included.
+ *
+ * Three is what removes the blink. Each is keyed by film id and stays
+ * mounted as the stack advances, so by the time a card is revealed its
+ * poster has been in the document — and decoded — for two swipes. They
+ * sit exactly behind each other, so at rest only the top one is visible.
  */
-const PRELOAD_AHEAD = 3
+const STACK_SIZE = 3
 
 /** Frame 03. */
 export function Swipe() {
@@ -114,19 +115,6 @@ export function Swipe() {
     }
   }, [sessionId, userId, navigate])
 
-  /* ─── preload ───────────────────────────────────────────────────── */
-
-  useEffect(() => {
-    if (!deck) return
-    for (let i = index + 2; i <= index + PRELOAD_AHEAD && i < deck.length; i++) {
-      const url = posterUrl(deck[i]!.poster_path, 'w500')
-      if (url) {
-        const img = new Image()
-        img.src = url
-      }
-    }
-  }, [deck, index])
-
   /* ─── swiping ───────────────────────────────────────────────────── */
 
   const onCommit = useCallback(
@@ -188,9 +176,9 @@ export function Swipe() {
     )
   }
 
-  const film = deck[index]
-  const next = deck[index + 1]
-  const remaining = deck.length - index
+  // Top card first. Keys are film ids, so advancing the index reuses the
+  // cards behind rather than remounting them.
+  const stack = deck.slice(index, index + STACK_SIZE)
   const progress = Math.round(((index + 1) / deck.length) * 100)
 
   return (
@@ -221,25 +209,21 @@ export function Swipe() {
       ) : null}
 
       <div className="deck">
-        {/* The furthest back stays abstract — it is a sliver of edge and
-            a third poster there would be noise. Dropped as the films
-            behind run out, so the last card never sits on a phantom
-            pile. */}
-        {remaining > 2 ? <div className="deck-back deck-back--1" /> : null}
-
-        {/* The next film, rendered for real. It is visible from the
-            first pixel of a drag, and because it is a whole card the
-            moment the top one flies away reveals something finished
-            rather than a placeholder that then swaps. */}
-        {next ? (
-          <div className="card card--next" aria-hidden="true">
-            <CardFace film={next} />
-          </div>
-        ) : null}
-
-        {film ? (
-          <SwipeCard ref={cardRef} film={film} onCommit={onCommit} disabled={finishing} />
-        ) : null}
+        {/* Rendered in order, front to back, and separated by z-index
+            rather than DOM order so the nodes never have to be
+            reshuffled. The stack shortens by itself near the end of the
+            deck, so the last card sits on nothing. */}
+        {stack.map((card, offset) => (
+          <SwipeCard
+            key={card.id}
+            ref={offset === 0 ? cardRef : null}
+            film={card}
+            isTop={offset === 0}
+            zIndex={STACK_SIZE - offset}
+            onCommit={onCommit}
+            disabled={finishing}
+          />
+        ))}
       </div>
 
       <div className="deck-actions">

@@ -140,6 +140,45 @@ Deno.serve(async (req) => {
       return ok({ genres: data.genres ?? [] })
     }
 
+    /**
+     * Runtimes for a specific set of films.
+     *
+     * Only /movie/{id} carries a runtime, so this is one request per
+     * film — which is why it runs when films are added rather than for
+     * every search result nobody will add. Batched with a small
+     * concurrency cap: 50 at once would trip TMDB's rate limit, and one
+     * at a time would take most of a minute.
+     */
+    if (action === 'details') {
+      const ids = Array.isArray(body.ids) ? body.ids.map(Number).filter(Number.isFinite) : []
+      if (ids.length === 0) return ok({ details: [] })
+      if (ids.length > MAX_LIMIT) return fail(`at most ${MAX_LIMIT} ids per call`, 400)
+
+      const details: { tmdb_id: number; runtime: number | null }[] = []
+      const CONCURRENCY = 8
+
+      for (let i = 0; i < ids.length; i += CONCURRENCY) {
+        const slice = ids.slice(i, i + CONCURRENCY)
+        const batch = await Promise.all(
+          slice.map(async (id) => {
+            try {
+              const film = await tmdbGet(`/movie/${id}`, {}, tmdbKey)
+              // TMDB reports 0 for plenty of films; treat that as absent
+              // rather than storing a runtime of zero minutes.
+              const runtime = Number(film.runtime)
+              return { tmdb_id: id, runtime: Number.isFinite(runtime) && runtime > 0 ? runtime : null }
+            } catch {
+              // One unavailable film must not fail the whole import.
+              return { tmdb_id: id, runtime: null }
+            }
+          }),
+        )
+        details.push(...batch)
+      }
+
+      return ok({ details })
+    }
+
     let raw: TmdbMovie[] = []
 
     if (action === 'search') {

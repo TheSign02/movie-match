@@ -647,20 +647,6 @@ input.codecell:focus-visible {
   flex: 1;
   margin-top: 18px;
 }
-.deck-back {
-  position: absolute;
-  inset: 0;
-  border-radius: var(--r-card);
-  border: 1px solid var(--border-default);
-}
-.deck-back--1 {
-  background: var(--bg-sunken);
-  transform: rotate(4.5deg) scale(0.955);
-}
-.deck-back--2 {
-  background: var(--bg-raised);
-  transform: rotate(-2.5deg) scale(0.978);
-}
 
 .card {
   position: absolute;
@@ -677,12 +663,14 @@ input.codecell:focus-visible {
   cursor: grab;
   user-select: none;
 }
-/* The next film, sitting behind the live card so the deck reads as a
-   stack of real films rather than of grey rectangles. Takes the same
-   transform the abstract .deck-back--2 had. Never interactive: the
-   gesture belongs to the card on top. */
-.card--next {
-  transform: rotate(-2.5deg) scale(0.978);
+/* Cards behind the live one sit exactly behind it: same size, same
+   position, no tilt. Two reasons. At rest the top card hides them
+   completely, so the deck shows one card rather than a fan of edges.
+   And when the top card leaves, the next is already where it needs to
+   be — a tilted card would visibly snap into place.
+
+   Never interactive: the gesture belongs to the card on top. */
+.card--behind {
   pointer-events: none;
 }
 
@@ -692,17 +680,6 @@ input.codecell:focus-visible {
   width: 100%;
   height: 100%;
   object-fit: cover;
-}
-.card__grain {
-  position: absolute;
-  inset: 0;
-  opacity: 0.16;
-  background-image: repeating-linear-gradient(
-    115deg,
-    rgba(255, 255, 255, 0.5) 0 1px,
-    transparent 1px 5px
-  );
-  pointer-events: none;
 }
 .card__scrim {
   position: absolute;
@@ -824,6 +801,11 @@ input.codecell:focus-visible {
   background: var(--accent);
   color: var(--on-accent);
   box-shadow: var(--glow-control);
+  /* Larger than .round's 30px on purpose. The heart glyph occupies less
+     of its em box than the cross, so matching font-size leaves it
+     looking smaller than its neighbour. This matches them by eye. */
+  font-size: 38px;
+  line-height: 1;
 }
 .round--like:active {
   background: var(--accent-active);
@@ -1001,4 +983,81 @@ input.codecell:focus-visible {
   background: var(--poster-4);
   transform: rotate(6deg);
   margin-left: -16px;
+}
+
+/* ─── Match detail (BUILD: not in the design frames) ────── */
+
+/* Tapping a result tile brings the film forward at card size, which is
+   the only place a match's description is readable. Fixed rather than
+   absolute so it covers the scrolled grid, not just the viewport slice
+   the grid happens to be showing. */
+.detail {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: calc(var(--inset-top) + 20px) 20px calc(var(--inset-bottom) + 20px);
+  background: rgba(0, 0, 0, 0.86);
+  animation: detail-in var(--dur-base) var(--ease-out);
+}
+@keyframes detail-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.detail__card {
+  position: relative;
+  width: 100%;
+  max-width: 360px;
+  /* 2:3, the poster's own ratio, capped so a tall phone does not
+     stretch it past the screen. */
+  aspect-ratio: 2 / 3;
+  max-height: 100%;
+  border-radius: var(--r-card);
+  overflow: hidden;
+  background: var(--bg-card);
+  border: 1px solid var(--border-default);
+  box-shadow: var(--shadow-card);
+}
+
+.detail__close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 2;
+  width: var(--tap-min);
+  height: var(--tap-min);
+  border-radius: 50%;
+  border: 1px solid var(--border-strong);
+  background: rgba(0, 0, 0, 0.55);
+  color: var(--text-secondary);
+  font-size: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* The description can outrun a 2:3 card for a wordy film, so the meta
+   block scrolls inside the card rather than spilling out of it. */
+.detail__card .card__meta {
+  max-height: 72%;
+  overflow-y: auto;
+}
+
+.tile {
+  /* It is a button now. */
+  display: block;
+  width: 100%;
+  padding: 0;
+  text-align: left;
+  background: none;
+}
+.tile:active {
+  transform: scale(0.985);
 }

@@ -170,6 +170,21 @@ async function main() {
 
     // ─── discover / bulk import ─────────────────────────────────────
 
+    section('Runtimes')
+
+    const rtIds = hits.slice(0, 3).map((h) => h.tmdb_id)
+    const rt = await invoke(client, { action: 'details', ids: rtIds })
+    check('details returns a row per id', rt.data?.details?.length === rtIds.length,
+      `got ${rt.data?.details?.length}`)
+    check(
+      'each is a positive runtime or null, never zero',
+      (rt.data?.details ?? []).every(
+        (d) => d.runtime === null || (Number.isInteger(d.runtime) && d.runtime > 0),
+      ),
+      JSON.stringify(rt.data?.details),
+    )
+    check('an empty id list is not an error', (await invoke(client, { action: 'details', ids: [] })).data?.details?.length === 0)
+
     section('Bulk import')
 
     const bulk = await invoke(client, { action: 'discover', sort: 'vote_average.desc', limit: 50 })

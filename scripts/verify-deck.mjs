@@ -67,7 +67,7 @@ async function anonUser() {
 async function fetchDeck(client, movieIds) {
   const { data, error } = await client
     .from('movies')
-    .select('id, title, year, poster_path, overview')
+    .select('id, title, year, poster_path, overview, runtime')
     .in('id', movieIds)
 
   if (error) throw new Error(error.message)
@@ -90,9 +90,9 @@ async function main() {
   console.log(`Target: ${URL}\n`)
 
   sql(`
-    insert into movies (tmdb_id, title, year, poster_path, overview)
+    insert into movies (tmdb_id, title, year, poster_path, overview, runtime)
     select -9000 - n, 'VERIFY FIXTURE ' || lpad(n::text, 2, '0'), 1970 + n,
-           '/f' || n || '.jpg', 'fixture overview'
+           '/f' || n || '.jpg', 'fixture overview', 90 + n
     from generate_series(1, 22) as g(n)
     on conflict (tmdb_id) do nothing;
   `)
@@ -138,6 +138,11 @@ async function main() {
     check(
       'every card carries what the card renders',
       deckA.every((f) => f.title && f.poster_path && typeof f.overview === 'string'),
+    )
+    check(
+      'including the runtime the byline shows next to the year',
+      deckA.every((f) => Number.isInteger(f.runtime) && f.runtime > 0),
+      `first: ${deckA[0]?.runtime}`,
     )
 
     section('Resume cursor')

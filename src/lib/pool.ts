@@ -1,5 +1,5 @@
 import { supabase } from './supabase'
-import type { TmdbHit } from './tmdb'
+import { fetchRuntimes, type TmdbHit } from './tmdb'
 
 export type PoolFilm = {
   id: string
@@ -7,6 +7,7 @@ export type PoolFilm = {
   title: string
   year: number | null
   poster_path: string | null
+  runtime: number | null
   added_at: string
 }
 
@@ -14,7 +15,7 @@ export type PoolFilm = {
 export async function fetchPool(): Promise<PoolFilm[]> {
   const { data, error } = await supabase
     .from('movies')
-    .select('id, tmdb_id, title, year, poster_path, added_at')
+    .select('id, tmdb_id, title, year, poster_path, runtime, added_at')
     .is('retired_at', null)
     .order('added_at', { ascending: false })
 
@@ -33,12 +34,24 @@ export async function fetchPool(): Promise<PoolFilm[]> {
 export async function addFilms(hits: TmdbHit[]): Promise<number> {
   if (hits.length === 0) return 0
 
+  // Runtime is the one field search and discover do not carry, so it is
+  // fetched here — once per film, at the only moment anyone cares.
+  // A failure must not block the import: the card falls back to showing
+  // the year alone.
+  let runtimes = new Map<number, number | null>()
+  try {
+    runtimes = await fetchRuntimes(hits.map((h) => h.tmdb_id))
+  } catch {
+    /* added without runtimes; the deck copes */
+  }
+
   const rows = hits.map((h) => ({
     tmdb_id: h.tmdb_id,
     title: h.title,
     year: h.year,
     poster_path: h.poster_path,
     overview: h.overview,
+    runtime: runtimes.get(h.tmdb_id) ?? null,
     retired_at: null,
   }))
 

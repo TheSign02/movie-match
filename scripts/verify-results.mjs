@@ -102,11 +102,15 @@ function subscribed(channel) {
   })
 }
 
-/** Builds a finished round with a controllable overlap. */
-async function playRound({ likesA, likesB, finishB = true }) {
-  const A = await anonUser()
-  const B = await anonUser()
-
+/**
+ * Builds a finished round with a controllable overlap.
+ *
+ * Takes the two players rather than making new ones. A user may be in
+ * any number of sessions — players is unique on (session_id, user_id) —
+ * and anonymous sign-ins are rate limited to 30 an hour per IP, which a
+ * suite that minted two users per round used to eat through.
+ */
+async function playRound(A, B, { likesA, likesB, finishB = true }) {
   const created = await A.client.rpc('create_session', { p_display_name: 'Ada' })
   if (created.error) throw new Error(created.error.message)
   const { session_id: sessionId, code, player_id: playerA } = created.data[0]
@@ -148,13 +152,16 @@ async function main() {
     on conflict (tmdb_id) do nothing;
   `)
 
+  // Three users for the whole suite. Every round below is played by the
+  // same two people.
+  const A = await anonUser()
+  const B = await anonUser()
+  const stranger = await anonUser()
+
   try {
     /* ─── the waiting screen's handoff ───────────────────────────── */
 
     section('Waiting — the realtime handoff')
-
-    const A = await anonUser()
-    const B = await anonUser()
 
     const created = await A.client.rpc('create_session', { p_display_name: 'Ada' })
     const { session_id: sessionId, code, player_id: playerA } = created.data[0]
@@ -233,6 +240,11 @@ async function main() {
       (matches.data ?? []).every((m) => m.title && m.poster_path && 'year' in m),
     )
     check(
+      'and what the tap-to-expand detail needs',
+      (matches.data ?? []).every((m) => 'overview' in m && 'runtime' in m),
+      `keys: ${Object.keys((matches.data ?? [])[0] ?? {}).sort().join(',')}`,
+    )
+    check(
       'and nothing it should not have',
       (matches.data ?? []).every((m) => !('liked' in m) && !('player_id' in m)),
     )
@@ -255,14 +267,14 @@ async function main() {
 
     section('Results — no overlap')
 
-    const zero = await playRound({
+    const zero = await playRound(A, B, {
       likesA: (i) => i < 10,
       likesB: (i) => i >= 10,
     })
-    const zeroMatches = await zero.A.client.rpc('get_matches', { p_session_id: zero.sessionId })
+    const zeroMatches = await A.client.rpc('get_matches', { p_session_id: zero.sessionId })
     check('a round with no overlap returns zero matches', zeroMatches.data?.length === 0)
 
-    const zeroTotals = await zero.A.client.rpc('liked_counts', { p_session_id: zero.sessionId })
+    const zeroTotals = await A.client.rpc('liked_counts', { p_session_id: zero.sessionId })
     check(
       'both totals are still available for the no-overlap copy',
       zeroTotals.data?.length === 2 && zeroTotals.data.every((r) => r.liked === 10),
@@ -273,13 +285,13 @@ async function main() {
 
     section('Abandonment escape hatch')
 
-    const stuck = await playRound({
+    const stuck = await playRound(A, B, {
       likesA: (i) => i < 8,
       likesB: (i) => i >= 4 && i < 10,
       finishB: false,
     })
 
-    const early = await stuck.A.client.rpc('get_matches', { p_session_id: stuck.sessionId })
+    const early = await A.client.rpc('get_matches', { p_session_id: stuck.sessionId })
     check(
       'matches are locked while the partner has not finished',
       !!early.error && /not ready/i.test(early.error.message),
@@ -287,7 +299,7 @@ async function main() {
     )
 
     // The partner must not be able to end a round they have not finished.
-    const abandonedByB = await stuck.B.client.rpc('abandon_round', {
+    const abandonedByB = await B.client.rpc('abandon_round', {
       p_session_id: stuck.sessionId,
     })
     check(
@@ -296,16 +308,15 @@ async function main() {
       abandonedByB.error?.message ?? '(no error)',
     )
 
-    const outsider = await anonUser()
-    const abandonedByStranger = await outsider.client.rpc('abandon_round', {
+    const abandonedByStranger = await stranger.client.rpc('abandon_round', {
       p_session_id: stuck.sessionId,
     })
     check('a stranger cannot end the round', !!abandonedByStranger.error)
 
-    const abandoned = await stuck.A.client.rpc('abandon_round', { p_session_id: stuck.sessionId })
+    const abandoned = await A.client.rpc('abandon_round', { p_session_id: stuck.sessionId })
     check('the finished player can end the round', !abandoned.error, abandoned.error?.message ?? '')
 
-    const afterStatus = await stuck.A.client
+    const afterStatus = await A.client
       .from('sessions')
       .select('status')
       .eq('id', stuck.sessionId)
@@ -316,7 +327,7 @@ async function main() {
       `status ${afterStatus.data.status}`,
     )
 
-    const partial = await stuck.A.client.rpc('get_matches', { p_session_id: stuck.sessionId })
+    const partial = await A.client.rpc('get_matches', { p_session_id: stuck.sessionId })
     // A liked 0-7, B liked 4-9 before stopping. Overlap 4,5,6,7.
     check(
       'partial matches are revealed from what the partner did swipe',
@@ -324,7 +335,7 @@ async function main() {
       `got ${partial.data?.length}`,
     )
 
-    const bStillBlind = await stuck.A.client
+    const bStillBlind = await A.client
       .from('swipes')
       .select('id')
       .eq('player_id', stuck.playerB)
@@ -334,103 +345,6 @@ async function main() {
       `${bStillBlind.data?.length} rows`,
     )
 
-    /* ─── another twenty, same two people ────────────────────────── */
-
-    section('Rematch')
-
-    const pair = await playRound({ likesA: (i) => i < 10, likesB: (i) => i < 10 })
-
-    // A player who never taps has to be moved too, so the results screen
-    // subscribes to the new round arriving.
-    const pushed = catcher('sessions INSERT carrying rematch_of')
-    const rematchChannel = pair.B.client
-      .channel(`rematch:${pair.sessionId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'sessions',
-          filter: `rematch_of=eq.${pair.sessionId}`,
-        },
-        (payload) => pushed.settle(payload.new),
-      )
-    await subscribed(rematchChannel)
-
-    const first = await pair.A.client.rpc('rematch', { p_session_id: pair.sessionId })
-    check('a participant can start another twenty', !first.error, first.error?.message ?? '')
-
-    const newId = first.data?.[0]?.session_id
-    if (newId) createdSessions.push(newId)
-
-    // The bug this replaces: create_session gave each player their own
-    // lobby. Both callers must land on one session.
-    const second = await pair.B.client.rpc('rematch', { p_session_id: pair.sessionId })
-    check(
-      'the partner tapping it lands in the SAME round, not a second one',
-      second.data?.[0]?.session_id === newId,
-      `${second.data?.[0]?.session_id} vs ${newId}`,
-    )
-
-    const rounds = await pair.A.client
-      .from('sessions')
-      .select('id', { count: 'exact', head: true })
-      .eq('rematch_of', pair.sessionId)
-    check('exactly one rematch exists for the round', rounds.count === 1, `count ${rounds.count}`)
-
-    try {
-      const row = await pushed.wait()
-      check('the partner is pushed into it without tapping', row.id === newId)
-    } catch (err) {
-      check('the partner is pushed into it without tapping', false, err.message)
-    }
-    await pair.B.client.removeChannel(rematchChannel)
-
-    const newPlayers = await pair.A.client
-      .from('players')
-      .select('slot, display_name, finished_at')
-      .eq('session_id', newId)
-      .order('slot')
-    check(
-      'both players are already in, with their names and slots',
-      newPlayers.data?.length === 2 &&
-        newPlayers.data[0].display_name === 'Ada' &&
-        newPlayers.data[1].display_name === 'Grace',
-      JSON.stringify(newPlayers.data?.map((p) => [p.slot, p.display_name])),
-    )
-    check(
-      'and neither is carrying a finished_at from the last round',
-      (newPlayers.data ?? []).every((p) => p.finished_at === null),
-    )
-
-    const newSession = await pair.A.client
-      .from('sessions')
-      .select('status, movie_ids, code')
-      .eq('id', newId)
-      .single()
-    check(
-      'the new round is waiting, with a fresh full deck',
-      newSession.data.status === 'waiting' && newSession.data.movie_ids.length === 20,
-      `status ${newSession.data.status}, ${newSession.data.movie_ids.length} films`,
-    )
-    check(
-      'and a different code from the round it replaces',
-      newSession.data.code && newSession.data.movie_ids.length === 20,
-    )
-
-    // Either player may start it, straight away, because both are in.
-    const startNew = await pair.B.client.rpc('start_session', { p_session_id: newId })
-    check('it can be started immediately', !startNew.error, startNew.error?.message ?? '')
-
-    const stranger = await anonUser()
-    const strangerRematch = await stranger.client.rpc('rematch', {
-      p_session_id: pair.sessionId,
-    })
-    check(
-      'a stranger cannot rematch someone else round',
-      !!strangerRematch.error && /not a participant/i.test(strangerRematch.error.message),
-      strangerRematch.error?.message ?? '(no error)',
-    )
   } finally {
     sql(`
       delete from sessions where id in (${createdSessions.map((id) => `'${id}'`).join(', ') || "'00000000-0000-0000-0000-000000000000'"});
