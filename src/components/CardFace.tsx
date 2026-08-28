@@ -1,5 +1,6 @@
 import type { DeckFilm } from '../lib/deck'
 import { posterUrl } from '../lib/tmdb'
+import { GenreChips } from './GenreChips'
 
 /**
  * Everything inside a card that isn't the gesture: poster, scrim and the
@@ -33,11 +34,17 @@ export function CardFace({ film }: { film: DeckFilm }) {
       <div className="card__scrim" />
 
       <div className="card__meta">
-        {/* The design's chips carry genre, and its byline a director.
-            Neither is in the movies table — §8 fixes the stored shape,
-            and runtime is already one addition past it. */}
+        {/* The design puts the chips in their own row above the title.
+            They sit beside the year and runtime instead, which is where
+            they read as belonging. Director is still absent: it is not in
+            the movies table and would cost a request per film to get. */}
         <div className="card__title">{film.title}</div>
-        {meta ? <div className="card__by">{meta}</div> : null}
+        {meta || film.genres?.length ? (
+          <div className="card__by">
+            {meta ? <span>{meta}</span> : null}
+            <GenreChips genres={film.genres} />
+          </div>
+        ) : null}
         {film.overview ? <p className="card__blurb">{film.overview}</p> : null}
       </div>
     </>

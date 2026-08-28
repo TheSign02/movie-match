@@ -7,6 +7,7 @@ export type Match = {
   poster_path: string | null
   overview: string
   runtime: number | null
+  genres: string[] | null
 }
 
 export type LikedCount = {

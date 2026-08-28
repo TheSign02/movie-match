@@ -1,5 +1,5 @@
 import { supabase } from './supabase'
-import { fetchRuntimes, type TmdbHit } from './tmdb'
+import { fetchDetails, type TmdbHit } from './tmdb'
 
 export type PoolFilm = {
   id: string
@@ -41,15 +41,15 @@ export async function addFilms(hits: TmdbHit[]): Promise<number> {
   const byId = new Map(hits.map((h) => [h.tmdb_id, h]))
   hits = [...byId.values()]
 
-  // Runtime is the one field search and discover do not carry, so it is
-  // fetched here — once per film, at the only moment anyone cares.
-  // A failure must not block the import: the card falls back to showing
-  // the year alone.
-  let runtimes = new Map<number, number | null>()
+  // Runtime and genres are the fields search and discover do not carry,
+  // so they are fetched here — once per film, at the only moment anyone
+  // cares. A failure must not block the import: the card falls back to
+  // the year alone and no chips.
+  let details = new Map<number, { runtime: number | null; genres: string[] }>()
   try {
-    runtimes = await fetchRuntimes(hits.map((h) => h.tmdb_id))
+    details = await fetchDetails(hits.map((h) => h.tmdb_id))
   } catch {
-    /* added without runtimes; the deck copes */
+    /* added without them; the deck copes */
   }
 
   const rows = hits.map((h) => ({
@@ -58,7 +58,8 @@ export async function addFilms(hits: TmdbHit[]): Promise<number> {
     year: h.year,
     poster_path: h.poster_path,
     overview: h.overview,
-    runtime: runtimes.get(h.tmdb_id) ?? null,
+    runtime: details.get(h.tmdb_id)?.runtime ?? null,
+    genres: details.get(h.tmdb_id)?.genres ?? null,
     retired_at: null,
   }))
 

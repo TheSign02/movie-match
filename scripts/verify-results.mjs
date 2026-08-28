@@ -145,9 +145,10 @@ async function main() {
   console.log(`Target: ${URL}\n`)
 
   sql(`
-    insert into movies (tmdb_id, title, year, poster_path, overview)
+    insert into movies (tmdb_id, title, year, poster_path, overview, runtime, genres)
     select -9000 - n, 'VERIFY FIXTURE ' || lpad(n::text, 2, '0'), 1970 + n,
-           '/f' || n || '.jpg', 'fixture overview'
+           '/f' || n || '.jpg', 'fixture overview', 90 + n,
+           array['Drama', 'Romance', 'Thriller', 'Comedy']
     from generate_series(1, 22) as g(n)
     on conflict (tmdb_id) do nothing;
   `)
@@ -243,6 +244,17 @@ async function main() {
       'and what the tap-to-expand detail needs',
       (matches.data ?? []).every((m) => 'overview' in m && 'runtime' in m),
       `keys: ${Object.keys((matches.data ?? [])[0] ?? {}).sort().join(',')}`,
+    )
+    // Same caveat as the deck: the pool is mostly real films, whose genre
+    // counts vary. What matters is that the column survives get_matches.
+    check(
+      'and the genres for the chips, on the tile and the detail alike',
+      (matches.data ?? []).every((m) => m.genres === null || Array.isArray(m.genres)),
+      `first: ${JSON.stringify((matches.data ?? [])[0]?.genres)}`,
+    )
+    check(
+      'with at least one match carrying some',
+      (matches.data ?? []).some((m) => (m.genres ?? []).length > 0),
     )
     check(
       'and nothing it should not have',

@@ -67,7 +67,7 @@ async function anonUser() {
 async function fetchDeck(client, movieIds) {
   const { data, error } = await client
     .from('movies')
-    .select('id, title, year, poster_path, overview, runtime')
+    .select('id, title, year, poster_path, overview, runtime, genres')
     .in('id', movieIds)
 
   if (error) throw new Error(error.message)
@@ -90,9 +90,12 @@ async function main() {
   console.log(`Target: ${URL}\n`)
 
   sql(`
-    insert into movies (tmdb_id, title, year, poster_path, overview, runtime)
+    insert into movies (tmdb_id, title, year, poster_path, overview, runtime, genres)
     select -9000 - n, 'VERIFY FIXTURE ' || lpad(n::text, 2, '0'), 1970 + n,
-           '/f' || n || '.jpg', 'fixture overview', 90 + n
+           '/f' || n || '.jpg', 'fixture overview', 90 + n,
+           -- Four on purpose: the chips cap at three, so this proves the
+           -- cap is a display decision and not a storage limit.
+           array['Drama', 'Romance', 'Thriller', 'Comedy']
     from generate_series(1, 22) as g(n)
     on conflict (tmdb_id) do nothing;
   `)
@@ -143,6 +146,24 @@ async function main() {
       'including the runtime the byline shows next to the year',
       deckA.every((f) => Number.isInteger(f.runtime) && f.runtime > 0),
       `first: ${deckA[0]?.runtime}`,
+    )
+    // Not "every film has four": create_session samples the whole active
+    // pool, so the deck is mostly real films and a real film has however
+    // many genres it has. The fixtures are the ones with a known count.
+    const fixtures = deckA.filter((f) => f.title.startsWith('VERIFY FIXTURE'))
+    check(
+      'genres come through as an array on every card',
+      deckA.every((f) => f.genres === null || Array.isArray(f.genres)),
+      `first: ${JSON.stringify(deckA[0]?.genres)}`,
+    )
+    check(
+      'and at least one card actually has some',
+      deckA.some((f) => (f.genres ?? []).length > 0),
+    )
+    check(
+      'a fixture keeps all four, so the three-chip cap is a display rule',
+      fixtures.length === 0 || fixtures.every((f) => f.genres.length === 4),
+      `${fixtures.length} fixtures in this deck`,
     )
 
     section('Resume cursor')

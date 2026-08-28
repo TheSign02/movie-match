@@ -7,6 +7,7 @@
  *   { action: 'search',   q }                      title search
  *   { action: 'discover', sort, genre, decade, limit }   bulk import
  *   { action: 'genres' }                           genre list for the UI
+ *   { action: 'details', ids }                     runtime + genres
  *
  * An Edge Function bypasses RLS, so admin membership is checked
  * explicitly on every call. Without that check this endpoint would hand
@@ -154,7 +155,11 @@ Deno.serve(async (req) => {
       if (ids.length === 0) return ok({ details: [] })
       if (ids.length > MAX_LIMIT) return fail(`at most ${MAX_LIMIT} ids per call`, 400)
 
-      const details: { tmdb_id: number; runtime: number | null }[] = []
+      const details: {
+        tmdb_id: number
+        runtime: number | null
+        genres: string[]
+      }[] = []
       const CONCURRENCY = 8
 
       for (let i = 0; i < ids.length; i += CONCURRENCY) {
@@ -163,13 +168,28 @@ Deno.serve(async (req) => {
           slice.map(async (id) => {
             try {
               const film = await tmdbGet(`/movie/${id}`, {}, tmdbKey)
+
               // TMDB reports 0 for plenty of films; treat that as absent
               // rather than storing a runtime of zero minutes.
               const runtime = Number(film.runtime)
-              return { tmdb_id: id, runtime: Number.isFinite(runtime) && runtime > 0 ? runtime : null }
+
+              // Names, not ids. /movie/{id} already resolves them, and
+              // the player side has no way to look ids up — the genre
+              // list is behind this function's admin check.
+              const genres: string[] = Array.isArray(film.genres)
+                ? film.genres
+                    .map((g: { name?: string }) => g?.name)
+                    .filter((name: unknown): name is string => typeof name === 'string')
+                : []
+
+              return {
+                tmdb_id: id,
+                runtime: Number.isFinite(runtime) && runtime > 0 ? runtime : null,
+                genres,
+              }
             } catch {
               // One unavailable film must not fail the whole import.
-              return { tmdb_id: id, runtime: null }
+              return { tmdb_id: id, runtime: null, genres: [] }
             }
           }),
         )

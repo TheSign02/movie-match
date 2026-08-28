@@ -8,6 +8,8 @@ export type DeckFilm = {
   overview: string
   /** Minutes. Null for the many films TMDB has no runtime for. */
   runtime: number | null
+  /** Resolved names, roughly primary-first. The card shows the top few. */
+  genres: string[] | null
 }
 
 /**
@@ -21,7 +23,7 @@ export type DeckFilm = {
 export async function fetchDeck(movieIds: string[]): Promise<DeckFilm[]> {
   const { data, error } = await supabase
     .from('movies')
-    .select('id, title, year, poster_path, overview, runtime')
+    .select('id, title, year, poster_path, overview, runtime, genres')
     .in('id', movieIds)
 
   if (error) throw new Error(error.message)

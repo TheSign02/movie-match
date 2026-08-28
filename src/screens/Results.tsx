@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 
+import { GenreChips } from '../components/GenreChips'
 import { MatchDetail } from '../components/MatchDetail'
 import { Screen } from '../components/Screen'
 import { fetchLikedCounts, fetchMatches, type LikedCount, type Match } from '../lib/results'
@@ -214,6 +215,7 @@ export function Results() {
               <div className="tile__meta">
                 <div className="tile__title">{match.title}</div>
                 <div className="tile__year">{sub}</div>
+                <GenreChips genres={match.genres} small />
               </div>
             </button>
           )
@@ -235,6 +237,7 @@ export function Results() {
             poster_path: open.poster_path,
             overview: open.overview,
             runtime: open.runtime,
+            genres: open.genres,
           }}
           onClose={() => setOpen(null)}
         />

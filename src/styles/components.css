@@ -694,10 +694,14 @@ input.codecell:focus-visible {
   bottom: 0;
   padding: 26px 22px 24px;
 }
+/* BUILD: the design gives the chips their own row above the title, with
+   14px beneath. They now sit inline beside the year and runtime, so the
+   bottom margin goes and wrapping is allowed — three genres will not fit
+   next to "2023 · 106 min" on a narrow phone. */
 .chips {
   display: flex;
+  flex-wrap: wrap;
   gap: 7px;
-  margin-bottom: 14px;
 }
 .chip {
   font-size: var(--size-eyebrow);
@@ -721,6 +725,13 @@ input.codecell:focus-visible {
   font-weight: 500;
   color: var(--accent-soft);
   margin-top: 8px;
+  /* Holds the year, the runtime and the genre chips on one wrapping
+     line. align-items keeps the chips centred against the text rather
+     than sitting on its baseline. */
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 .card__blurb {
   font-size: var(--size-body);
@@ -935,6 +946,17 @@ input.codecell:focus-visible {
   font-size: var(--size-xs);
   color: var(--text-muted);
   margin-top: 4px;
+}
+/* A tile is half a phone wide, so the card's chip size would wrap three
+   genres onto three lines. */
+.chips--sm {
+  margin-top: 7px;
+  gap: 5px;
+}
+.chips--sm .chip {
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  padding: 3px 7px;
 }
 /* Two tilted poster shapes for the no-overlap state. */
 .pair {

@@ -85,18 +85,19 @@ export function fetchGenres() {
   return invoke<{ genres: Genre[] }>({ action: 'genres' }).then((r) => r.genres)
 }
 
+export type FilmDetails = { runtime: number | null; genres: string[] }
+
 /**
- * Runtimes by tmdb_id. One TMDB request per film behind the scenes,
- * since only /movie/{id} carries a runtime — which is why this is called
- * when films are added rather than for every search result.
+ * Runtime and genres by tmdb_id. One TMDB request per film behind the
+ * scenes, since only /movie/{id} carries either — which is why this is
+ * called when films are added rather than for every search result.
  */
-export async function fetchRuntimes(ids: number[]): Promise<Map<number, number | null>> {
+export async function fetchDetails(ids: number[]): Promise<Map<number, FilmDetails>> {
   if (ids.length === 0) return new Map()
 
-  const { details } = await invoke<{ details: { tmdb_id: number; runtime: number | null }[] }>({
-    action: 'details',
-    ids,
-  })
+  const { details } = await invoke<{
+    details: { tmdb_id: number; runtime: number | null; genres: string[] }[]
+  }>({ action: 'details', ids })
 
-  return new Map(details.map((d) => [d.tmdb_id, d.runtime]))
+  return new Map(details.map((d) => [d.tmdb_id, { runtime: d.runtime, genres: d.genres ?? [] }]))
 }
