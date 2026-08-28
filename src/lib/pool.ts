@@ -34,6 +34,13 @@ export async function fetchPool(): Promise<PoolFilm[]> {
 export async function addFilms(hits: TmdbHit[]): Promise<number> {
   if (hits.length === 0) return 0
 
+  // Second line of defence. The Edge Function already dedupes, but a
+  // single duplicate reaching the upsert below fails the entire batch —
+  // ON CONFLICT DO UPDATE cannot affect the same row twice in one
+  // statement — so it is worth not depending on that.
+  const byId = new Map(hits.map((h) => [h.tmdb_id, h]))
+  hits = [...byId.values()]
+
   // Runtime is the one field search and discover do not carry, so it is
   // fetched here — once per film, at the only moment anyone cares.
   // A failure must not block the import: the card falls back to showing

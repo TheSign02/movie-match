@@ -191,7 +191,7 @@ export function Lobby() {
     // http on the LAN — fall back to copying the link.
     if (typeof navigator.share === 'function') {
       try {
-        await navigator.share({ title: 'Reel Consensus', text: `Lobby ${code}`, url: joinUrl })
+        await navigator.share({ title: 'Movie Match', text: `Lobby ${code}`, url: joinUrl })
         return
       } catch {
         return // a cancelled share sheet is not an error

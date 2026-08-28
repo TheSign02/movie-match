@@ -70,7 +70,7 @@ async function invoke(client, body) {
 }
 
 async function main() {
-  console.log('Reel Consensus — TMDB proxy verification')
+  console.log('Movie Match — TMDB proxy verification')
   console.log(`Target: ${URL}\n`)
 
   const client = createClient(URL, ANON, {

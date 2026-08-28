@@ -86,7 +86,7 @@ async function swipeCount(client, playerId) {
 }
 
 async function main() {
-  console.log('Reel Consensus — deck and resume verification')
+  console.log('Movie Match — deck and resume verification')
   console.log(`Target: ${URL}\n`)
 
   sql(`

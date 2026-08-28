@@ -141,7 +141,7 @@ async function playRound(A, B, { likesA, likesB, finishB = true }) {
 }
 
 async function main() {
-  console.log('Reel Consensus — waiting and results verification')
+  console.log('Movie Match — waiting and results verification')
   console.log(`Target: ${URL}\n`)
 
   sql(`

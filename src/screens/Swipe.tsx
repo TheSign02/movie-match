@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 
 import { Screen } from '../components/Screen'
 import { SwipeCard, type SwipeCardHandle } from '../components/SwipeCard'
+import { LikeIcon, PassIcon } from '../components/icons'
 import {
   fetchDeck,
   fetchSwipeCount,
@@ -233,7 +234,7 @@ export function Swipe() {
           disabled={finishing}
           aria-label="Pass"
         >
-          ✕
+          <PassIcon />
         </button>
         <button
           className="round round--like tap-exempt"
@@ -241,7 +242,7 @@ export function Swipe() {
           disabled={finishing}
           aria-label="Like"
         >
-          ♥
+          <LikeIcon />
         </button>
       </div>
     </Screen>

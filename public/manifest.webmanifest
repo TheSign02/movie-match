@@ -1,6 +1,6 @@
 {
-  "name": "Reel Consensus",
-  "short_name": "Reel",
+  "name": "Movie Match",
+  "short_name": "Movie Match",
   "description": "Two people swipe the same twenty films and see only the ones they both liked.",
   "start_url": "/",
   "scope": "/",

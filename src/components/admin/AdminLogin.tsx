@@ -39,7 +39,7 @@ export function AdminLogin() {
     <Screen>
       <form onSubmit={submit} className="flex flex-1 flex-col justify-center gap-5">
         <div>
-          <div className="eyebrow eyebrow--label">Reel Consensus</div>
+          <div className="eyebrow eyebrow--label">Movie Match</div>
           <h1 className="t-lg mt-3">Pool admin</h1>
         </div>
 

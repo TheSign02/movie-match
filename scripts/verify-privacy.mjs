@@ -110,7 +110,7 @@ function msg(error) {
 // ─── the run ────────────────────────────────────────────────────────
 
 async function main() {
-  console.log('Reel Consensus — privacy verification')
+  console.log('Movie Match — privacy verification')
   console.log(`Target: ${URL}\n`)
 
   sql(`

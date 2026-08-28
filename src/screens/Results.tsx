@@ -142,8 +142,11 @@ export function Results() {
               {error}
             </div>
           ) : null}
+          {/* Labelled for where it actually goes. This screen has nothing
+              else in it, so unlike the matches grid it keeps a primary
+              action rather than leaning on the back arrow alone. */}
           <button className="btn btn--primary" onClick={leave}>
-            Swipe another twenty
+            Back to home
           </button>
         </div>
       </Screen>
@@ -216,14 +219,9 @@ export function Results() {
           )
         })}
 
-        <button className="tile--again" onClick={leave}>
-          <b>＋</b>
-          <s>
-            Swipe another
-            <br />
-            twenty
-          </s>
-        </button>
+        {/* The design's dashed "Swipe another twenty" tile is gone: the
+            back button is the only way out, and one exit is clearer than
+            two that do the same thing. */}
       </div>
 
       {/* Match is the get_matches row shape; CardFace speaks DeckFilm.

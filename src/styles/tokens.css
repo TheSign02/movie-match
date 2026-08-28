@@ -133,9 +133,17 @@
   --control-h:     68px;
 
   /* Real device insets. Requires viewport-fit=cover on the
-     viewport meta tag, or these report 0 on iOS.              */
+     viewport meta tag, or these report 0 on iOS.
+
+     Bottom carries a floor, because the inset is genuinely 0
+     in a browser tab and on desktop — only a home indicator or
+     a notch makes it non-zero. Without the floor, every screen
+     ends flush against the bottom edge, which is what the
+     design's fixed 34px was standing in for. max() picks the
+     real inset where there is one (~34px on an iPhone) and
+     20px everywhere else.                                     */
   --inset-top:    env(safe-area-inset-top, 0px);
-  --inset-bottom: env(safe-area-inset-bottom, 0px);
+  --inset-bottom: max(env(safe-area-inset-bottom, 0px), 20px);
   --inset-left:   env(safe-area-inset-left, 0px);
   --inset-right:  env(safe-area-inset-right, 0px);
 }

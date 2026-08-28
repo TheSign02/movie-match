@@ -774,6 +774,8 @@ input.codecell:focus-visible {
   gap: 34px;
   padding-top: 22px;
 }
+/* Both icons are SVG at a fixed size, so there is no font-size here to
+   drift out of step between them. */
 .round {
   width: 76px;
   height: 76px;
@@ -781,7 +783,6 @@ input.codecell:focus-visible {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 30px;
   transition: transform var(--dur-fast) var(--ease-out);
   flex: none;
 }
@@ -801,11 +802,6 @@ input.codecell:focus-visible {
   background: var(--accent);
   color: var(--on-accent);
   box-shadow: var(--glow-control);
-  /* Larger than .round's 30px on purpose. The heart glyph occupies less
-     of its em box than the cross, so matching font-size leaves it
-     looking smaller than its neighbour. This matches them by eye. */
-  font-size: 38px;
-  line-height: 1;
 }
 .round--like:active {
   background: var(--accent-active);
@@ -940,30 +936,6 @@ input.codecell:focus-visible {
   color: var(--text-muted);
   margin-top: 4px;
 }
-.tile--again {
-  height: 256px;
-  border-radius: var(--r-lg);
-  border: 1px dashed var(--border-default);
-  background: transparent;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  color: var(--text-faint);
-}
-.tile--again b {
-  font-size: 24px;
-  font-weight: 400;
-}
-.tile--again s {
-  font-size: var(--size-sm);
-  text-align: center;
-  line-height: 1.4;
-  padding: 0 14px;
-  text-decoration: none;
-}
-
 /* Two tilted poster shapes for the no-overlap state. */
 .pair {
   display: flex;

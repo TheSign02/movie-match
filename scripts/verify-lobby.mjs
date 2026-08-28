@@ -119,7 +119,7 @@ function subscribed(channel) {
 }
 
 async function main() {
-  console.log('Reel Consensus — lobby and realtime verification')
+  console.log('Movie Match — lobby and realtime verification')
   console.log(`Target: ${URL}\n`)
 
   sql(`

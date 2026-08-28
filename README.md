@@ -1,4 +1,4 @@
-# Reel Consensus
+# Movie Match
 
 Mobile web app. Two people swipe the same 20 films; they see only the films they
 both liked. One admin curates the film pool.

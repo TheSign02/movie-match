@@ -68,14 +68,12 @@ export function Home() {
       <div className="glow glow--home" />
 
       <div className="pt-[46px]">
-        <div className="eyebrow eyebrow--accent">
-          <i />
-          Movie night
-        </div>
-        <div className="wordmark mt-[22px]">
-          Reel
+        {/* The design's "Movie night" eyebrow and its accent dot are
+            deliberately gone; the wordmark opens the screen on its own. */}
+        <div className="wordmark">
+          Movie
           <br />
-          Consensus
+          Match
         </div>
         <p className="lede mt-4 max-w-[280px]">
           Both of you swipe the same twenty films. You only see the ones you both liked.

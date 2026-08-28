@@ -218,6 +218,19 @@ Deno.serve(async (req) => {
       return fail(`unknown action: ${action || '(none)'}`, 400)
     }
 
+    // TMDB pagination is not stable. With sort_by=vote_average.desc a
+    // great many films tie, and the result window shifts between the
+    // page requests above, so the same film can arrive on two pages.
+    // Left in, that breaks the import outright rather than cosmetically:
+    // ON CONFLICT DO UPDATE cannot affect the same row twice in one
+    // statement, so one duplicate fails the whole upsert.
+    const seen = new Set<number>()
+    raw = raw.filter((m) => {
+      if (seen.has(m.id)) return false
+      seen.add(m.id)
+      return true
+    })
+
     // A card with no poster is not worth dealing, so drop those here
     // rather than letting the admin add a film the deck can't render.
     const trimmed = raw.filter((m) => m.poster_path).map(trim)
