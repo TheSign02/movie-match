@@ -104,7 +104,8 @@ function catcher(label, timeoutMs = EVENT_TIMEOUT_MS) {
 function subscribed(channel) {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error('channel never subscribed')), EVENT_TIMEOUT_MS)
-    channel.subscribe((status) => {
+    channel.subscribe((status, err) => {
+      console.log(`        [realtime] channel ${status}${err ? ` err=${err.message}` : ''}`)
       if (status === 'SUBSCRIBED') {
         clearTimeout(timer)
         resolve()
@@ -149,7 +150,9 @@ async function main() {
 
     // Player 1 is now sitting in the lobby with a live subscription, the
     // state this whole phase is about.
-    const playerInsert = catcher('players INSERT on player 1')
+    // 30s, not the default 15: this is the check that has been seen to
+    // miss, and a generous window separates "slow" from "never".
+    const playerInsert = catcher('players INSERT on player 1', 30_000)
     const startEventForA = catcher('sessions UPDATE on player 1')
 
     const channelA = A.client
@@ -158,6 +161,12 @@ async function main() {
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'players', filter: `session_id=eq.${sessionId}` },
         (payload) => {
+          // Logged, not just counted: this check has been seen to miss,
+          // and knowing whether nothing arrived or only the echo arrived
+          // is the difference between two very different bugs.
+          console.log(
+            `        [realtime] players INSERT slot=${payload.new.slot} own=${payload.new.id === playerA}`,
+          )
           // Realtime replays recent WAL entries to a new subscriber, so
           // the first INSERT to arrive is often player 1's own row from
           // moments earlier. The lobby screen refetches on any insert so
@@ -188,6 +197,9 @@ async function main() {
       insertedRow = await playerInsert.wait()
       check('the players INSERT reaches player 1 over the wire', true)
     } catch (err) {
+      // Seen to happen twice during the build, not reproducible in
+      // isolation. The lobby screen polls behind the subscription for
+      // exactly this reason, and the next check is that fallback.
       check('the players INSERT reaches player 1 over the wire', false, err.message)
     }
 
@@ -203,9 +215,13 @@ async function main() {
       )
     }
 
+    // The poll path, which is what the lobby screen falls back to. This
+    // has to hold even when the subscription above misses, because it is
+    // the guarantee that someone is never stranded on "waiting for
+    // player 2" while their partner is already in.
     const seen = await A.client.from('players').select('slot, display_name').order('slot')
     check(
-      'player 1 now reads both players',
+      'a plain refetch reads both players, whatever realtime did',
       seen.data?.length === 2,
       `${seen.data?.length} rows`,
     )

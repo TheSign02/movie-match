@@ -19,6 +19,13 @@ import { usePlayerSession } from '../lib/usePlayerSession'
  */
 const ESCAPE_AFTER_MS = 3 * 60 * 1000
 
+/**
+ * How often to re-check whether the round finished, in case the realtime
+ * event never lands. Slower than the lobby's poll because this screen can
+ * be open for minutes.
+ */
+const POLL_MS = 5000
+
 /** Frame 04. */
 export function Waiting() {
   const navigate = useNavigate()
@@ -80,7 +87,16 @@ export function Waiting() {
     }
   }, [sessionId, userId, navigate])
 
-  /* ─── realtime: the round completing ────────────────────────────── */
+  /* ─── realtime, plus a poll behind it ───────────────────────────── */
+
+  const checkComplete = useCallback(async () => {
+    try {
+      const current = await fetchSessionById(sessionId)
+      if (current?.status === 'complete') navigate(`/results/${sessionId}`, { replace: true })
+    } catch {
+      /* the next poll will do */
+    }
+  }, [sessionId, navigate])
 
   useEffect(() => {
     if (!ready) return
@@ -102,6 +118,19 @@ export function Waiting() {
       void supabase.removeChannel(channel)
     }
   }, [ready, sessionId, navigate])
+
+  /**
+   * Same reasoning as the lobby's poll: a postgres_changes event was
+   * seen going missing twice during the build, and this screen has no
+   * other way out. A dropped event here would leave someone waiting
+   * indefinitely on a round that had already finished — and, worse, the
+   * escape hatch would then offer to end a round that was already over.
+   */
+  useEffect(() => {
+    if (!ready) return
+    const timer = window.setInterval(() => void checkComplete(), POLL_MS)
+    return () => window.clearInterval(timer)
+  }, [ready, checkComplete])
 
   /* ─── the escape hatch ──────────────────────────────────────────── */
 

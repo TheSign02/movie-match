@@ -73,10 +73,16 @@ cleans up after itself.
 | Suite | Covers |
 |---|---|
 | `verify:privacy` | The four non-negotiable product rules. 45 checks |
-| `verify:tmdb` | The Edge Function, its admin guard, and pool writes. 21 checks |
+| `verify:tmdb` | The Edge Function, its admin guard, and pool writes. 25 checks |
 | `verify:lobby` | Two real clients, two realtime subscriptions. 14 checks |
-| `verify:deck` | Deck order, the resume cursor, finishing. 19 checks |
-| `verify:results` | Both result states and the escape hatch. 19 checks |
+| `verify:deck` | Deck order, the resume cursor, finishing. 20 checks |
+| `verify:results` | Both result states and the escape hatch. 20 checks |
+
+Anonymous sign-ins are rate limited to **30 an hour per IP**, and a full
+`verify:all` spends about thirteen of them. Two runs back to back will
+fail with `Request rate limit reached`, which is the limit doing its job
+rather than a bug. Raise it at Authentication → Rate Limits if it gets in
+the way.
 
 `verify:privacy` is the one that matters most: it signs in as three separate
 anonymous users and asserts what the server *refuses*. A player must never be
@@ -96,6 +102,15 @@ host's environment.
 
 ## Things worth knowing
 
+- **Realtime is the fast path, not the guarantee.** The lobby and the
+  waiting screen both poll behind their subscriptions, every 3s and 5s
+  respectively. A `postgres_changes` event was seen going missing three
+  times across a dozen runs of `verify:lobby` — the channel reported
+  SUBSCRIBED, the partner joined, and nothing arrived — and it never
+  reproduced in isolation. Without the poll, a dropped event strands a
+  player on "waiting for player 2" with no way out but a manual refresh.
+  `verify:lobby` asserts the realtime path and the refetch path
+  separately, so a failure says which layer broke.
 - **A PWA has its own storage jar.** The installed app is a *different*
   anonymous user than the browser tab on the same phone. Expected for v1, and
   confusing during testing if you don't know it.

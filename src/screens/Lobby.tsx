@@ -6,6 +6,7 @@ import { supabase } from '../lib/supabase'
 import {
   fetchPlayers,
   fetchSessionByCode,
+  fetchSessionById,
   rememberSession,
   resolveRoute,
   startSession,
@@ -13,6 +14,9 @@ import {
   type Player,
 } from '../lib/session'
 import { usePlayerSession } from '../lib/usePlayerSession'
+
+/** How often to re-check the lobby if a realtime event never lands. */
+const POLL_MS = 3000
 
 /** Frames 02 and 02b. */
 export function Lobby() {
@@ -28,6 +32,10 @@ export function Lobby() {
   const [loading, setLoading] = useState(true)
 
   const userId = auth?.user.id ?? null
+
+  // Derived here rather than after the loading guard, because the poll
+  // effect below needs it and hooks cannot live behind an early return.
+  const bothIn = players.length >= 2
 
   /* ─── first load ────────────────────────────────────────────────── */
 
@@ -70,9 +78,24 @@ export function Lobby() {
     }
   }, [code, userId, navigate])
 
-  /* ─── realtime ──────────────────────────────────────────────────── */
+  /* ─── realtime, plus a poll behind it ───────────────────────────── */
 
   const sessionId = game?.id ?? null
+
+  /** Applied by both the subscription and the poll. */
+  const refresh = useCallback(async () => {
+    if (!sessionId) return
+    try {
+      const [rows, current] = await Promise.all([
+        fetchPlayers(sessionId),
+        fetchSessionById(sessionId),
+      ])
+      setPlayers(rows)
+      if (current?.status === 'swiping') navigate(`/swipe/${sessionId}`)
+    } catch {
+      /* a failed poll is not worth a banner; the next one will do */
+    }
+  }, [sessionId, navigate])
 
   useEffect(() => {
     if (!sessionId) return
@@ -90,7 +113,7 @@ export function Lobby() {
           filter: `session_id=eq.${sessionId}`,
         },
         () => {
-          void fetchPlayers(sessionId).then(setPlayers)
+          void refresh()
         },
       )
       // BUILD: §12 lists only the players subscription for the lobby,
@@ -114,7 +137,27 @@ export function Lobby() {
     return () => {
       void supabase.removeChannel(channel)
     }
-  }, [sessionId, navigate])
+  }, [sessionId, navigate, refresh])
+
+  /**
+   * The safety net, and it is not paranoia: a postgres_changes event was
+   * observed going missing twice while building this — the subscription
+   * reported SUBSCRIBED, the partner joined, and nothing arrived. It was
+   * not reproducible in isolation, so it cannot be designed around.
+   *
+   * Without this, a dropped event leaves someone staring at "Waiting for
+   * player 2" while their partner is already sitting in the lobby, and
+   * the only way out is a manual refresh. Realtime stays the fast path —
+   * it lands in a few hundred milliseconds — and this guarantees the
+   * screen is correct within a few seconds either way.
+   *
+   * Stops as soon as the lobby is full, so it never runs during a round.
+   */
+  useEffect(() => {
+    if (!sessionId || bothIn) return
+    const timer = window.setInterval(() => void refresh(), POLL_MS)
+    return () => window.clearInterval(timer)
+  }, [sessionId, bothIn, refresh])
 
   /* ─── actions ───────────────────────────────────────────────────── */
 
@@ -176,7 +219,6 @@ export function Lobby() {
     )
   }
 
-  const bothIn = players.length >= 2
   const me = players.find((p) => p.user_id === userId)
 
   return (
