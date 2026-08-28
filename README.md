@@ -97,8 +97,24 @@ it in a `finally` block.
 
 Static SPA. `vercel.json` and `public/_redirects` both rewrite every route to
 `index.html` — without that, refreshing `/lobby/K7R9` is a 404 and the resume
-story falls over. Set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` in the
-host's environment.
+story falls over.
+
+**The host needs no environment variables.** `.env.production` is committed and
+Vite reads it at build time — verified by building against an `envDir`
+containing only that file, so nothing else could have supplied the values.
+`.env` stays gitignored and covers local development.
+
+That is deliberate rather than a shortcut. Vercel refuses to store a
+`VITE_`-prefixed value as a Sensitive variable — correctly, since the prefix
+means "inline this into the browser bundle" — and the team policy that used to
+relax that has been removed. Both values are public by design anyway: the URL
+is a public endpoint, and the anon key identifies the project rather than
+authorising anything. `verify:privacy` asserts the privacy model holds while
+holding that exact key.
+
+What must never go in `.env.production`, or in any `VITE_` variable: the TMDB
+key, which lives only in the Edge Function's environment, and the
+`service_role` key, which this app never uses.
 
 ## Things worth knowing
 

@@ -6,7 +6,12 @@ dist/
 dist-ssr/
 *.tsbuildinfo
 
-# local env - real credentials, never committed
+# local env - real credentials, never committed.
+#
+# .env.production is deliberately NOT ignored and none of the patterns
+# below match it. It carries the deployed build's Supabase URL and anon
+# key, both of which are public by design, so the host needs no
+# environment variables configured. Nothing secret goes in it.
 .env
 .env.local
 .env.*.local
